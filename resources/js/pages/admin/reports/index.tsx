@@ -101,6 +101,39 @@ type TripSummary = {
     avg_return_min: number | null;
 };
 
+type StopRow = {
+    dev_eui: string;
+    device_name: string;
+    unit_type: string;
+    type: 'waiting' | 'delay';
+    zone: string;
+    started_at: string;
+    ended_at: string;
+    duration_min: number;
+};
+
+type StopSummary = {
+    dev_eui: string;
+    device_name: string;
+    unit_type: string;
+    waiting_count: number;
+    waiting_min: number;
+    delay_count: number;
+    delay_min: number;
+};
+
+type GatewayRow = {
+    gateway_id: string;
+    uplink_count: number;
+    device_count: number;
+    avg_rssi: number;
+    min_rssi: number;
+    max_rssi: number;
+    avg_snr: number;
+    first_seen: string;
+    last_seen: string;
+};
+
 const today = new Date().toISOString().slice(0, 10);
 const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
@@ -259,6 +292,12 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
         const params: Record<string, string> = { from: dateFrom, to: dateTo };
         if (devEui !== 'all') params.dev_eui = devEui;
         window.location.href = adminReports.export.gpsLogs.url() + buildQueryString(params);
+    };
+
+    const handleExportExcel = () => {
+        const params: Record<string, string> = { from: dateFrom, to: dateTo };
+        if (devEui !== 'all') params.dev_eui = devEui;
+        window.location.href = adminReports.export.fleetUtilization.url() + buildQueryString(params);
     };
 
     const columns: ColumnDef<UtilizationRow>[] = [
@@ -479,10 +518,16 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                     </Button>
                 </div>
 
-                <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5" disabled={!loaded}>
-                    <Download className="h-4 w-4" />
-                    Export GPS Logs CSV
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5" disabled={!loaded}>
+                        <Download className="h-4 w-4" />
+                        Export GPS Logs CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-1.5" disabled={!loaded}>
+                        <Download className="h-4 w-4" />
+                        Export Excel
+                    </Button>
+                </div>
             </div>
         </div>
     );
@@ -529,6 +574,12 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
         const params: Record<string, string> = { from: dateFrom, to: dateTo, alert_type: 'overspeed' };
         if (devEui !== 'all') params.dev_eui = devEui;
         window.location.href = adminReports.export.alerts.url() + buildQueryString(params);
+    };
+
+    const handleExportExcel = () => {
+        const params: Record<string, string> = { from: dateFrom, to: dateTo };
+        if (devEui !== 'all') params.dev_eui = devEui;
+        window.location.href = adminReports.export.speedViolations.url() + buildQueryString(params);
     };
 
     const columns: ColumnDef<ViolationRow>[] = [
@@ -724,10 +775,16 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
                     </Button>
                 </div>
 
-                <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5" disabled={!loaded}>
-                    <Download className="h-4 w-4" />
-                    Export Violations CSV
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExport} className="gap-1.5" disabled={!loaded}>
+                        <Download className="h-4 w-4" />
+                        Export Violations CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-1.5" disabled={!loaded}>
+                        <Download className="h-4 w-4" />
+                        Export Excel
+                    </Button>
+                </div>
             </div>
         </div>
     );
@@ -772,6 +829,12 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
         setSummary([]);
         setWarning(null);
         setLoaded(false);
+    };
+
+    const handleExportExcel = () => {
+        const params: Record<string, string> = { from: dateFrom, to: dateTo };
+        if (devEui !== 'all') params.dev_eui = devEui;
+        window.location.href = adminReports.export.cycleTime.url() + buildQueryString(params);
     };
 
     const columns: ColumnDef<TripRow>[] = [
@@ -958,6 +1021,440 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
                 <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
                     Next
                 </Button>
+                <Button variant="outline" size="sm" onClick={handleExportExcel} className="ml-auto gap-1.5" disabled={!loaded}>
+                    <Download className="h-4 w-4" />
+                    Export Excel
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function DelayWaitingTab({ devices }: { devices: DeviceOption[] }) {
+    const [devEui, setDevEui] = useState('all');
+    const [dateFrom, setDateFrom] = useState(today);
+    const [dateTo, setDateTo] = useState(today);
+    const [stops, setStops] = useState<StopRow[]>([]);
+    const [summary, setSummary] = useState<StopSummary[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+    const [sorting, setSorting] = useState<SortingState>([]);
+
+    const fetchData = useCallback(async (dEui: string, from: string, to: string) => {
+        setLoading(true);
+        try {
+            const params: Record<string, string> = { from, to };
+            if (dEui !== 'all') params.dev_eui = dEui;
+            const res = await fetch(adminReports.delayWaiting.url() + buildQueryString(params), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const json = await res.json();
+            setStops(json.stops ?? []);
+            setSummary(json.summary ?? []);
+            setLoaded(true);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const handleApply = () => fetchData(devEui, dateFrom, dateTo);
+    const handleClear = () => {
+        setDevEui('all');
+        setDateFrom(today);
+        setDateTo(today);
+        setStops([]);
+        setSummary([]);
+        setLoaded(false);
+    };
+
+    const handleExportExcel = () => {
+        const params: Record<string, string> = { from: dateFrom, to: dateTo };
+        if (devEui !== 'all') params.dev_eui = devEui;
+        window.location.href = adminReports.export.delayWaiting.url() + buildQueryString(params);
+    };
+
+    const columns: ColumnDef<StopRow>[] = [
+        {
+            accessorKey: 'device_name',
+            header: 'Device',
+            cell: ({ row }) => (
+                <div>
+                    <div className="font-medium">{row.original.device_name}</div>
+                    <Badge variant="outline" className="mt-0.5 text-xs capitalize">{row.original.unit_type}</Badge>
+                </div>
+            ),
+        },
+        {
+            accessorKey: 'type',
+            header: 'Type',
+            cell: ({ row }) =>
+                row.original.type === 'waiting' ? (
+                    <Badge variant="outline" className="border-amber-500/20 bg-amber-500/15 text-amber-600 capitalize">
+                        Waiting
+                    </Badge>
+                ) : (
+                    <Badge variant="outline" className="border-red-500/20 bg-red-500/15 text-red-600 capitalize">
+                        Delay
+                    </Badge>
+                ),
+        },
+        {
+            accessorKey: 'zone',
+            header: 'Zone',
+            cell: ({ row }) => <span className="text-sm capitalize text-muted-foreground">{row.original.zone.replace('_', ' ')}</span>,
+        },
+        {
+            accessorKey: 'started_at',
+            header: ({ column }) => (
+                <Button variant="ghost" className="-ml-3 h-8" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+                    Started <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
+            cell: ({ row }) => (
+                <span className="text-sm text-muted-foreground" title={row.original.started_at}>
+                    {formatTime(row.original.started_at)}
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'duration_min',
+            header: ({ column }) => (
+                <Button variant="ghost" className="-ml-3 h-8" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+                    Duration <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
+            cell: ({ row }) => <span className="font-medium tabular-nums">{formatMin(row.original.duration_min)}</span>,
+        },
+    ];
+
+    const table = useReactTable({
+        data: stops,
+        columns,
+        state: { sorting },
+        onSortingChange: setSorting,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        initialState: { pagination: { pageSize: 20 } },
+    });
+
+    return (
+        <div className="flex flex-col gap-4">
+            <FilterBar
+                devices={devices}
+                devEui={devEui}
+                onDevEuiChange={setDevEui}
+                dateFrom={dateFrom}
+                onDateFromChange={setDateFrom}
+                dateTo={dateTo}
+                onDateToChange={setDateTo}
+                onClear={handleClear}
+                onApply={handleApply}
+                loading={loading}
+            />
+
+            {loaded && summary.length > 0 && (
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium">Per-Device Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Device</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Waiting Stops</TableHead>
+                                    <TableHead>Waiting Time</TableHead>
+                                    <TableHead>Delay Stops</TableHead>
+                                    <TableHead>Delay Time</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {summary.map((s) => (
+                                    <TableRow key={s.dev_eui}>
+                                        <TableCell className="font-medium">{s.device_name}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className="capitalize">
+                                                {s.unit_type}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="tabular-nums">{s.waiting_count}</TableCell>
+                                        <TableCell className="tabular-nums text-amber-600 dark:text-amber-400">
+                                            {formatMin(s.waiting_min)}
+                                        </TableCell>
+                                        <TableCell className="tabular-nums">{s.delay_count}</TableCell>
+                                        <TableCell className="tabular-nums text-red-600 dark:text-red-400">
+                                            {formatMin(s.delay_min)}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            )}
+
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        {table.getHeaderGroups().map((hg) => (
+                            <TableRow key={hg.id}>
+                                {hg.headers.map((h) => (
+                                    <TableHead key={h.id}>
+                                        {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                                    </TableHead>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            <TableSkeleton cols={columns.length} />
+                        ) : table.getRowModel().rows.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow key={row.id}>
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id}>
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                    {loaded
+                                        ? 'No waiting or delay stops found for the selected period.'
+                                        : 'Apply filters to load the report.'}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                    Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                    Page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                    Next
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportExcel} className="ml-auto gap-1.5" disabled={!loaded}>
+                    <Download className="h-4 w-4" />
+                    Export Excel
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function GatewayReliabilityTab() {
+    const [dateFrom, setDateFrom] = useState(firstOfMonth);
+    const [dateTo, setDateTo] = useState(today);
+    const [rows, setRows] = useState<GatewayRow[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+    const [sorting, setSorting] = useState<SortingState>([]);
+
+    const fetchData = useCallback(async (from: string, to: string) => {
+        setLoading(true);
+        try {
+            const params: Record<string, string> = { from, to };
+            const res = await fetch(adminReports.gatewayReliability.url() + buildQueryString(params), {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const json = await res.json();
+            setRows(json.data ?? []);
+            setLoaded(true);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const handleApply = () => fetchData(dateFrom, dateTo);
+    const handleClear = () => {
+        setDateFrom(firstOfMonth);
+        setDateTo(today);
+        setRows([]);
+        setLoaded(false);
+    };
+
+    const handleExportExcel = () => {
+        const params: Record<string, string> = { from: dateFrom, to: dateTo };
+        window.location.href = adminReports.export.gatewayReliability.url() + buildQueryString(params);
+    };
+
+    const columns: ColumnDef<GatewayRow>[] = [
+        {
+            accessorKey: 'gateway_id',
+            header: 'Gateway ID',
+            cell: ({ row }) => <span className="font-mono text-sm font-medium">{row.original.gateway_id}</span>,
+        },
+        {
+            accessorKey: 'uplink_count',
+            header: ({ column }) => (
+                <Button variant="ghost" className="-ml-3 h-8" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+                    Uplinks <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
+            cell: ({ row }) => <span className="tabular-nums font-medium">{row.original.uplink_count.toLocaleString()}</span>,
+        },
+        {
+            accessorKey: 'device_count',
+            header: 'Devices Served',
+            cell: ({ row }) => <span className="tabular-nums">{row.original.device_count}</span>,
+        },
+        {
+            accessorKey: 'avg_rssi',
+            header: ({ column }) => (
+                <Button variant="ghost" className="-ml-3 h-8" onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}>
+                    Avg RSSI <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
+            cell: ({ row }) => <span className="tabular-nums">{row.original.avg_rssi} dBm</span>,
+        },
+        {
+            accessorKey: 'min_rssi',
+            header: 'RSSI Range',
+            cell: ({ row }) => (
+                <span className="tabular-nums text-muted-foreground">
+                    {row.original.min_rssi} … {row.original.max_rssi} dBm
+                </span>
+            ),
+        },
+        {
+            accessorKey: 'avg_snr',
+            header: 'Avg SNR',
+            cell: ({ row }) => <span className="tabular-nums">{row.original.avg_snr} dB</span>,
+        },
+        {
+            accessorKey: 'last_seen',
+            header: 'Last Seen',
+            cell: ({ row }) => (
+                <span className="text-sm text-muted-foreground" title={row.original.last_seen}>
+                    {new Date(row.original.last_seen).toLocaleString()}
+                </span>
+            ),
+        },
+    ];
+
+    const table = useReactTable({
+        data: rows,
+        columns,
+        state: { sorting },
+        onSortingChange: setSorting,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        initialState: { pagination: { pageSize: 20 } },
+    });
+
+    return (
+        <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-muted-foreground">From date</Label>
+                    <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-40" />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <Label className="text-xs text-muted-foreground">To date</Label>
+                    <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-40" />
+                </div>
+                <Button onClick={handleApply} disabled={loading} size="sm" className="gap-1.5 self-end">
+                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                    {loading ? 'Loading…' : 'Apply'}
+                </Button>
+                {(dateFrom !== firstOfMonth || dateTo !== today) && (
+                    <Button variant="ghost" size="sm" onClick={handleClear} className="gap-1 self-end">
+                        <X className="h-3.5 w-3.5" />
+                        Reset
+                    </Button>
+                )}
+            </div>
+
+            {loaded && rows.length > 0 && (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Active Gateways</CardDescription>
+                            <CardTitle className="text-2xl tabular-nums">{rows.length}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Total Uplinks</CardDescription>
+                            <CardTitle className="text-2xl tabular-nums">
+                                {rows.reduce((s, r) => s + r.uplink_count, 0).toLocaleString()}
+                            </CardTitle>
+                        </CardHeader>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Avg RSSI (fleet)</CardDescription>
+                            <CardTitle className="text-2xl tabular-nums">
+                                {(rows.reduce((s, r) => s + r.avg_rssi, 0) / rows.length).toFixed(1)} dBm
+                            </CardTitle>
+                        </CardHeader>
+                    </Card>
+                </div>
+            )}
+
+            <div className="rounded-md border">
+                <Table>
+                    <TableHeader>
+                        {table.getHeaderGroups().map((hg) => (
+                            <TableRow key={hg.id}>
+                                {hg.headers.map((h) => (
+                                    <TableHead key={h.id}>
+                                        {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+                                    </TableHead>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            <TableSkeleton cols={columns.length} />
+                        ) : table.getRowModel().rows.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow key={row.id}>
+                                    {row.getVisibleCells().map((cell) => (
+                                        <TableCell key={cell.id}>
+                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                    {loaded ? 'No gateway activity found for the selected period.' : 'Apply filters to load the report.'}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                    Previous
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                    Page {table.getState().pagination.pageIndex + 1} of {Math.max(1, table.getPageCount())}
+                </span>
+                <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                    Next
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportExcel} className="ml-auto gap-1.5" disabled={!loaded}>
+                    <Download className="h-4 w-4" />
+                    Export Excel
+                </Button>
             </div>
         </div>
     );
@@ -1094,6 +1591,8 @@ export default function ReportsIndex({ devices }: PageProps) {
                         <TabsTrigger value="utilization">Fleet Utilization</TabsTrigger>
                         <TabsTrigger value="violations">Speed Violations</TabsTrigger>
                         <TabsTrigger value="cycle-time">Cycle Time</TabsTrigger>
+                        <TabsTrigger value="delay-waiting">Delay & Waiting</TabsTrigger>
+                        <TabsTrigger value="gateway-reliability">Gateway Reliability</TabsTrigger>
                         <TabsTrigger value="export">Export Data</TabsTrigger>
                     </TabsList>
 
@@ -1107,6 +1606,14 @@ export default function ReportsIndex({ devices }: PageProps) {
 
                     <TabsContent value="cycle-time">
                         <CycleTimeTab devices={devices} />
+                    </TabsContent>
+
+                    <TabsContent value="delay-waiting">
+                        <DelayWaitingTab devices={devices} />
+                    </TabsContent>
+
+                    <TabsContent value="gateway-reliability">
+                        <GatewayReliabilityTab />
                     </TabsContent>
 
                     <TabsContent value="export">

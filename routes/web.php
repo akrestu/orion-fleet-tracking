@@ -47,7 +47,14 @@ Route::middleware(['auth', 'verified', 'role:admin'])
         Route::get('reports/speed-violations', [AdminReportController::class, 'speedViolations'])->name('reports.speed-violations');
         Route::get('reports/export/gps-logs', [AdminReportController::class, 'exportGpsLogs'])->name('reports.export.gps-logs');
         Route::get('reports/export/alerts', [AdminReportController::class, 'exportAlerts'])->name('reports.export.alerts');
+        Route::get('reports/export/fleet-utilization', [AdminReportController::class, 'exportFleetUtilization'])->name('reports.export.fleet-utilization');
+        Route::get('reports/export/speed-violations', [AdminReportController::class, 'exportSpeedViolations'])->name('reports.export.speed-violations');
+        Route::get('reports/export/cycle-time', [AdminReportController::class, 'exportCycleTime'])->name('reports.export.cycle-time');
+        Route::get('reports/export/delay-waiting', [AdminReportController::class, 'exportDelayWaiting'])->name('reports.export.delay-waiting');
+        Route::get('reports/export/gateway-reliability', [AdminReportController::class, 'exportGatewayReliability'])->name('reports.export.gateway-reliability');
         Route::get('reports/cycle-time', [AdminReportController::class, 'cycleTime'])->name('reports.cycle-time');
+        Route::get('reports/delay-waiting', [AdminReportController::class, 'delayWaiting'])->name('reports.delay-waiting');
+        Route::get('reports/gateway-reliability', [AdminReportController::class, 'gatewayReliability'])->name('reports.gateway-reliability');
         Route::get('system-settings', [AdminSystemSettingController::class, 'index'])->name('system-settings.index');
         Route::put('system-settings', [AdminSystemSettingController::class, 'update'])->name('system-settings.update');
         Route::get('api-tokens', [AdminApiTokenController::class, 'index'])->name('api-tokens.index');

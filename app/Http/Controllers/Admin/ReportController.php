@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\ArrayExport;
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
 use App\Models\Device;
@@ -10,10 +11,13 @@ use App\Models\GpsLog;
 use App\Services\FleetUtilizationService;
 use App\Support\GeoHelper;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
@@ -51,6 +55,54 @@ class ReportController extends Controller
             return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
         }
 
+        $rows = $this->buildFleetUtilizationRows($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    public function exportFleetUtilization(Request $request): BinaryFileResponse
+    {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'dev_eui' => ['nullable', 'string'],
+        ]);
+
+        $from = $request->date('from') ?? now()->startOfMonth();
+        $to = $request->date('to') ?? now()->endOfDay();
+
+        if ($from->diffInDays($to) > 90) {
+            abort(422, 'Date range cannot exceed 90 days.');
+        }
+
+        $rows = $this->buildFleetUtilizationRows($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        $export = array_map(fn (array $r) => [
+            'Device Name' => $r['device_name'],
+            'DEV EUI' => $r['dev_eui'],
+            'Unit Type' => $r['unit_type'],
+            'Operation Hours' => $r['operation_hours'],
+            'Running Hours' => $r['running_hours'],
+            'Idle Hours' => $r['idle_hours'],
+            'Distance (km)' => $r['distance_km'],
+            'Avg Speed (km/h)' => $r['avg_speed_kmh'],
+            'Max Speed (km/h)' => $r['max_speed_kmh'],
+            'GPS Points' => $r['log_count'],
+        ], $rows);
+
+        $filename = 'fleet-utilization-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
+
+        return Excel::download(
+            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Operation Hours', 'Running Hours', 'Idle Hours', 'Distance (km)', 'Avg Speed (km/h)', 'Max Speed (km/h)', 'GPS Points'], 'Fleet Utilization'),
+            $filename,
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildFleetUtilizationRows(CarbonInterface $from, CarbonInterface $to, ?string $devEuiFilter): array
+    {
         // Exclude devices that are on standby or breakdown — they are not in operation.
         $excludedDevEuis = Device::whereIn('operational_status', ['standby', 'breakdown'])
             ->pluck('dev_eui');
@@ -58,7 +110,7 @@ class ReportController extends Controller
         // Devices with meaningful data (exclude standby/breakdown already handled above).
         $devEuis = Device::active()
             ->when($excludedDevEuis->isNotEmpty(), fn ($q) => $q->whereNotIn('dev_eui', $excludedDevEuis))
-            ->when($request->filled('dev_eui'), fn ($q) => $q->where('dev_eui', $request->dev_eui))
+            ->when($devEuiFilter, fn ($q) => $q->where('dev_eui', $devEuiFilter))
             ->orderBy('device_name')
             ->pluck('dev_eui', 'dev_eui');
 
@@ -85,7 +137,7 @@ class ReportController extends Controller
             ];
         }
 
-        return response()->json(['data' => array_values($rows)]);
+        return array_values($rows);
     }
 
     public function speedViolations(Request $request): JsonResponse
@@ -103,13 +155,58 @@ class ReportController extends Controller
             return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
         }
 
+        [$rows, $summary] = $this->buildSpeedViolationsData($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        return response()->json(['data' => $rows, 'summary' => $summary]);
+    }
+
+    public function exportSpeedViolations(Request $request): BinaryFileResponse
+    {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'dev_eui' => ['nullable', 'string'],
+        ]);
+
+        $from = $request->date('from') ?? now()->startOfMonth();
+        $to = $request->date('to') ?? now()->endOfDay();
+
+        if ($from->diffInDays($to) > 90) {
+            abort(422, 'Date range cannot exceed 90 days.');
+        }
+
+        [$rows] = $this->buildSpeedViolationsData($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        $export = array_map(fn (array $r) => [
+            'Device Name' => $r['device_name'],
+            'DEV EUI' => $r['dev_eui'],
+            'Unit Type' => $r['unit_type'],
+            'Speed (km/h)' => $r['speed_kmh'],
+            'Threshold (km/h)' => $r['threshold_kmh'],
+            'Triggered At' => $r['triggered_at'],
+            'Status' => $r['is_resolved'] ? 'Resolved' : 'Active',
+        ], $rows);
+
+        $filename = 'speed-violations-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
+
+        return Excel::download(
+            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Speed (km/h)', 'Threshold (km/h)', 'Triggered At', 'Status'], 'Speed Violations'),
+            $filename,
+        );
+    }
+
+    /**
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, array<string, mixed>>}
+     */
+    private function buildSpeedViolationsData(CarbonInterface $from, CarbonInterface $to, ?string $devEuiFilter): array
+    {
         $query = Alert::with('device')
             ->where('alert_type', 'overspeed')
             ->whereBetween('triggered_at', [$from, $to->copy()->endOfDay()])
             ->orderBy('triggered_at', 'desc');
 
-        if ($request->filled('dev_eui')) {
-            $query->where('dev_eui', $request->dev_eui);
+        if ($devEuiFilter) {
+            $query->where('dev_eui', $devEuiFilter);
         }
 
         $alerts = $query->get();
@@ -124,7 +221,7 @@ class ReportController extends Controller
             'triggered_at' => $alert->triggered_at?->toIso8601String(),
             'triggered_at_human' => $alert->triggered_at?->diffForHumans(),
             'is_resolved' => $alert->resolved_at !== null,
-        ]);
+        ])->values()->all();
 
         $summary = $alerts->groupBy('dev_eui')->map(function ($deviceAlerts, $devEui) {
             $device = $deviceAlerts->first()->device;
@@ -138,9 +235,9 @@ class ReportController extends Controller
                 'max_speed_kmh' => $speeds->isNotEmpty() ? round((float) $speeds->max(), 1) : null,
                 'avg_speed_kmh' => $speeds->isNotEmpty() ? round((float) $speeds->avg(), 1) : null,
             ];
-        })->values();
+        })->values()->all();
 
-        return response()->json(['data' => $rows, 'summary' => $summary]);
+        return [$rows, $summary];
     }
 
     public function exportGpsLogs(Request $request): StreamedResponse
@@ -268,17 +365,65 @@ class ReportController extends Controller
             return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
         }
 
+        ['trips' => $trips, 'summary' => $summary, 'warning' => $warning] = $this->buildCycleTimeData($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        return response()->json(['trips' => $trips, 'summary' => $summary, 'warning' => $warning]);
+    }
+
+    public function exportCycleTime(Request $request): BinaryFileResponse
+    {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'dev_eui' => ['nullable', 'string'],
+        ]);
+
+        $from = $request->date('from') ?? now()->startOfDay();
+        $to = $request->date('to') ?? now()->endOfDay();
+
+        if ($from->diffInDays($to) > 90) {
+            abort(422, 'Date range cannot exceed 90 days.');
+        }
+
+        ['trips' => $trips] = $this->buildCycleTimeData($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        $export = array_map(fn (array $t) => [
+            'Device Name' => $t['device_name'],
+            'DEV EUI' => $t['dev_eui'],
+            'Unit Type' => $t['unit_type'],
+            'Load Start' => $t['load_start'],
+            'Load End' => $t['load_end'],
+            'Dump Start' => $t['dump_start'],
+            'Dump End' => $t['dump_end'],
+            'Haul Duration (min)' => $t['haul_duration_min'],
+            'Return Duration (min)' => $t['return_duration_min'],
+            'Cycle Duration (min)' => $t['cycle_duration_min'],
+        ], $trips);
+
+        $filename = 'cycle-time-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
+
+        return Excel::download(
+            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Load Start', 'Load End', 'Dump Start', 'Dump End', 'Haul Duration (min)', 'Return Duration (min)', 'Cycle Duration (min)'], 'Cycle Time'),
+            $filename,
+        );
+    }
+
+    /**
+     * @return array{trips: array<int, array<string, mixed>>, summary: array<int, array<string, mixed>>, warning: ?string}
+     */
+    private function buildCycleTimeData(CarbonInterface $from, CarbonInterface $to, ?string $devEuiFilter): array
+    {
         // Only geofences with a meaningful zone_type
         $geofences = Geofence::where('is_active', true)
             ->whereIn('zone_type', ['loading', 'dumping', 'parking'])
             ->get();
 
         if ($geofences->isEmpty()) {
-            return response()->json(['trips' => [], 'summary' => [], 'warning' => 'No loading/dumping/parking zones configured.']);
+            return ['trips' => [], 'summary' => [], 'warning' => 'No loading/dumping/parking zones configured.'];
         }
 
         $devices = Device::active()
-            ->when($request->filled('dev_eui'), fn ($q) => $q->where('dev_eui', $request->dev_eui))
+            ->when($devEuiFilter, fn ($q) => $q->where('dev_eui', $devEuiFilter))
             ->orderBy('device_name')
             ->get(['dev_eui', 'device_name', 'unit_type'])
             ->keyBy('dev_eui');
@@ -415,6 +560,274 @@ class ReportController extends Controller
             ];
         }, $summaryMap));
 
-        return response()->json(['trips' => $trips, 'summary' => $summary]);
+        return ['trips' => $trips, 'summary' => $summary, 'warning' => null];
+    }
+
+    public function delayWaiting(Request $request): JsonResponse
+    {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'dev_eui' => ['nullable', 'string'],
+        ]);
+
+        $from = $request->date('from') ?? now()->startOfDay();
+        $to = $request->date('to') ?? now()->endOfDay();
+
+        if ($from->diffInDays($to) > 90) {
+            return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
+        }
+
+        ['stops' => $stops, 'summary' => $summary] = $this->buildDelayWaitingData($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        return response()->json(['stops' => $stops, 'summary' => $summary]);
+    }
+
+    public function exportDelayWaiting(Request $request): BinaryFileResponse
+    {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'dev_eui' => ['nullable', 'string'],
+        ]);
+
+        $from = $request->date('from') ?? now()->startOfDay();
+        $to = $request->date('to') ?? now()->endOfDay();
+
+        if ($from->diffInDays($to) > 90) {
+            abort(422, 'Date range cannot exceed 90 days.');
+        }
+
+        ['stops' => $stops] = $this->buildDelayWaitingData($from, $to, $request->string('dev_eui')->value() ?: null);
+
+        $export = array_map(fn (array $s) => [
+            'Device Name' => $s['device_name'],
+            'DEV EUI' => $s['dev_eui'],
+            'Unit Type' => $s['unit_type'],
+            'Type' => ucfirst($s['type']),
+            'Zone' => $s['zone'],
+            'Started At' => $s['started_at'],
+            'Ended At' => $s['ended_at'],
+            'Duration (min)' => $s['duration_min'],
+        ], $stops);
+
+        $filename = 'delay-waiting-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
+
+        return Excel::download(
+            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Type', 'Zone', 'Started At', 'Ended At', 'Duration (min)'], 'Delay & Waiting'),
+            $filename,
+        );
+    }
+
+    /**
+     * @return array{stops: array<int, array<string, mixed>>, summary: array<int, array<string, mixed>>}
+     */
+    private function buildDelayWaitingData(CarbonInterface $from, CarbonInterface $to, ?string $devEuiFilter): array
+    {
+        $idleThresholdKmh = 2.0;
+        $minStopSeconds = 180;
+        $maxGapSeconds = 300;
+
+        $geofences = Geofence::where('is_active', true)
+            ->whereIn('zone_type', ['loading', 'dumping', 'parking'])
+            ->get();
+
+        $devices = Device::active()
+            ->when($devEuiFilter, fn ($q) => $q->where('dev_eui', $devEuiFilter))
+            ->orderBy('device_name')
+            ->get(['dev_eui', 'device_name', 'unit_type'])
+            ->keyBy('dev_eui');
+
+        $stops = [];
+
+        foreach ($devices as $devEui => $device) {
+            $prev = null;
+            $stopStart = null;
+            $stopPoint = null;
+
+            $closeStop = function () use (&$stopStart, &$stopPoint, &$prev, $geofences, $devEui, $device, &$stops, $minStopSeconds) {
+                if ($stopStart === null || $prev === null) {
+                    return;
+                }
+
+                $duration = abs($prev->recorded_at->diffInSeconds($stopStart));
+                if ($duration < $minStopSeconds) {
+                    return;
+                }
+
+                $zone = null;
+                foreach ($geofences as $geofence) {
+                    if (GeoHelper::pointInPolygon((float) $stopPoint->latitude, (float) $stopPoint->longitude, $geofence->polygon)) {
+                        $zone = $geofence->zone_type;
+                        break;
+                    }
+                }
+
+                if ($zone === 'parking') {
+                    return;
+                }
+
+                $stops[] = [
+                    'dev_eui' => $devEui,
+                    'device_name' => $device?->device_name ?? $devEui,
+                    'unit_type' => $device?->unit_type ?? 'other',
+                    'type' => $zone === null ? 'delay' : 'waiting',
+                    'zone' => $zone ?? 'on_route',
+                    'latitude' => (float) $stopPoint->latitude,
+                    'longitude' => (float) $stopPoint->longitude,
+                    'started_at' => $stopStart->toIso8601String(),
+                    'ended_at' => $prev->recorded_at->toIso8601String(),
+                    'duration_min' => round($duration / 60, 1),
+                ];
+            };
+
+            GpsLog::where('dev_eui', $devEui)
+                ->whereBetween('recorded_at', [$from, $to->copy()->endOfDay()])
+                ->orderBy('recorded_at')
+                ->select(['dev_eui', 'latitude', 'longitude', 'speed_kmh', 'recorded_at'])
+                ->lazy()
+                ->each(function ($curr) use (&$prev, &$stopStart, &$stopPoint, $idleThresholdKmh, $maxGapSeconds, $closeStop) {
+                    if ($prev !== null) {
+                        $gap = abs($curr->recorded_at->diffInSeconds($prev->recorded_at));
+                        if ($gap > $maxGapSeconds) {
+                            $closeStop();
+                            $stopStart = null;
+                        }
+                    }
+
+                    $isStopped = (float) $curr->speed_kmh < $idleThresholdKmh;
+
+                    if ($isStopped) {
+                        if ($stopStart === null) {
+                            $stopStart = $curr->recorded_at;
+                            $stopPoint = $curr;
+                        }
+                    } else {
+                        $closeStop();
+                        $stopStart = null;
+                    }
+
+                    $prev = $curr;
+                });
+
+            $closeStop();
+        }
+
+        $summaryMap = [];
+        foreach ($stops as $stop) {
+            $key = $stop['dev_eui'];
+            if (! isset($summaryMap[$key])) {
+                $summaryMap[$key] = [
+                    'dev_eui' => $stop['dev_eui'],
+                    'device_name' => $stop['device_name'],
+                    'unit_type' => $stop['unit_type'],
+                    'waiting_count' => 0,
+                    'waiting_min' => 0.0,
+                    'delay_count' => 0,
+                    'delay_min' => 0.0,
+                ];
+            }
+
+            if ($stop['type'] === 'waiting') {
+                $summaryMap[$key]['waiting_count']++;
+                $summaryMap[$key]['waiting_min'] += $stop['duration_min'];
+            } else {
+                $summaryMap[$key]['delay_count']++;
+                $summaryMap[$key]['delay_min'] += $stop['duration_min'];
+            }
+        }
+
+        $summary = array_values(array_map(function ($s) {
+            $s['waiting_min'] = round($s['waiting_min'], 1);
+            $s['delay_min'] = round($s['delay_min'], 1);
+
+            return $s;
+        }, $summaryMap));
+
+        usort($stops, fn ($a, $b) => strcmp($b['started_at'], $a['started_at']));
+
+        return ['stops' => $stops, 'summary' => $summary];
+    }
+
+    public function gatewayReliability(Request $request): JsonResponse
+    {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $from = $request->date('from') ?? now()->subDay();
+        $to = $request->date('to') ?? now()->endOfDay();
+
+        if ($from->diffInDays($to) > 90) {
+            return response()->json(['message' => 'Date range cannot exceed 90 days.'], 422);
+        }
+
+        $rows = $this->buildGatewayReliabilityRows($from, $to);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    public function exportGatewayReliability(Request $request): BinaryFileResponse
+    {
+        $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $from = $request->date('from') ?? now()->subDay();
+        $to = $request->date('to') ?? now()->endOfDay();
+
+        if ($from->diffInDays($to) > 90) {
+            abort(422, 'Date range cannot exceed 90 days.');
+        }
+
+        $rows = $this->buildGatewayReliabilityRows($from, $to);
+
+        $export = array_map(fn (array $r) => [
+            'Gateway ID' => $r['gateway_id'],
+            'Uplinks' => $r['uplink_count'],
+            'Devices Served' => $r['device_count'],
+            'Avg RSSI (dBm)' => $r['avg_rssi'],
+            'Min RSSI (dBm)' => $r['min_rssi'],
+            'Max RSSI (dBm)' => $r['max_rssi'],
+            'Avg SNR (dB)' => $r['avg_snr'],
+            'First Seen' => $r['first_seen'],
+            'Last Seen' => $r['last_seen'],
+        ], $rows);
+
+        $filename = 'gateway-reliability-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
+
+        return Excel::download(
+            new ArrayExport($export, ['Gateway ID', 'Uplinks', 'Devices Served', 'Avg RSSI (dBm)', 'Min RSSI (dBm)', 'Max RSSI (dBm)', 'Avg SNR (dB)', 'First Seen', 'Last Seen'], 'Gateway Reliability'),
+            $filename,
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildGatewayReliabilityRows(CarbonInterface $from, CarbonInterface $to): array
+    {
+        return GpsLog::query()
+            ->selectRaw('gateway_id, COUNT(*) as uplink_count, COUNT(DISTINCT dev_eui) as device_count, AVG(rssi) as avg_rssi, MIN(rssi) as min_rssi, MAX(rssi) as max_rssi, AVG(snr) as avg_snr, MIN(recorded_at) as first_seen, MAX(recorded_at) as last_seen')
+            ->whereNotNull('gateway_id')
+            ->whereBetween('recorded_at', [$from, $to->copy()->endOfDay()])
+            ->groupBy('gateway_id')
+            ->orderByDesc('uplink_count')
+            ->get()
+            ->map(fn ($row) => [
+                'gateway_id' => $row->gateway_id,
+                'uplink_count' => (int) $row->uplink_count,
+                'device_count' => (int) $row->device_count,
+                'avg_rssi' => round((float) $row->avg_rssi, 1),
+                'min_rssi' => (int) $row->min_rssi,
+                'max_rssi' => (int) $row->max_rssi,
+                'avg_snr' => round((float) $row->avg_snr, 1),
+                'first_seen' => Carbon::parse($row->first_seen)->toIso8601String(),
+                'last_seen' => Carbon::parse($row->last_seen)->toIso8601String(),
+            ])
+            ->values()
+            ->all();
     }
 }

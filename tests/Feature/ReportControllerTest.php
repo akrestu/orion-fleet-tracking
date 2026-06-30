@@ -135,3 +135,169 @@ it('denies operator access to CSV exports', function () {
         ->get('/admin/reports/export/alerts')
         ->assertForbidden();
 });
+
+// --- Delay & waiting time ---
+
+it('detects a delay stop outside any geofence', function () {
+    $start = now()->subHours(2);
+
+    // Simulate a device reporting every 30s while stationary for 10 minutes (real send interval).
+    GpsLog::factory()->count(21)->sequence(
+        fn ($seq) => ['recorded_at' => $start->copy()->addSeconds($seq->index * 30)]
+    )->create([
+        'dev_eui' => $this->device->dev_eui,
+        'latitude' => 1.0,
+        'longitude' => 1.0,
+        'speed_kmh' => 0.5,
+    ]);
+
+    GpsLog::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'latitude' => 1.0,
+        'longitude' => 1.0,
+        'speed_kmh' => 40,
+        'recorded_at' => $start->copy()->addMinutes(11),
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->getJson('/admin/reports/delay-waiting?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertJsonStructure([
+            'stops' => ['*' => ['dev_eui', 'type', 'zone', 'started_at', 'ended_at', 'duration_min']],
+            'summary',
+        ]);
+
+    $stops = $response->json('stops');
+    expect($stops)->toHaveCount(1)
+        ->and($stops[0]['type'])->toBe('delay')
+        ->and($stops[0]['zone'])->toBe('on_route');
+});
+
+it('ignores short stationary periods below the minimum stop threshold', function () {
+    $start = now()->subHour();
+    GpsLog::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'speed_kmh' => 0.5,
+        'recorded_at' => $start,
+    ]);
+    GpsLog::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'speed_kmh' => 0.5,
+        'recorded_at' => $start->copy()->addMinute(),
+    ]);
+    GpsLog::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'speed_kmh' => 40,
+        'recorded_at' => $start->copy()->addMinutes(2),
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->getJson('/admin/reports/delay-waiting?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk();
+
+    expect($response->json('stops'))->toBeEmpty();
+});
+
+// --- Gateway reliability ---
+
+it('returns gateway reliability stats as JSON', function () {
+    GpsLog::factory()->count(3)->sequence(
+        fn ($seq) => ['recorded_at' => now()->subSeconds($seq->index + 1)]
+    )->create([
+        'dev_eui' => $this->device->dev_eui,
+        'gateway_id' => 'GW-001',
+        'rssi' => -90,
+        'snr' => 5,
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->getJson('/admin/reports/gateway-reliability?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertJsonStructure([
+            'data' => ['*' => ['gateway_id', 'uplink_count', 'device_count', 'avg_rssi', 'min_rssi', 'max_rssi', 'avg_snr', 'first_seen', 'last_seen']],
+        ]);
+
+    $data = $response->json('data');
+    expect($data)->toHaveCount(1)
+        ->and($data[0]['gateway_id'])->toBe('GW-001')
+        ->and($data[0]['uplink_count'])->toBe(3);
+});
+
+it('denies operator access to delay-waiting and gateway-reliability reports', function () {
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/delay-waiting')
+        ->assertForbidden();
+
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/gateway-reliability')
+        ->assertForbidden();
+});
+
+// --- Excel exports ---
+
+it('exports fleet utilization as Excel download', function () {
+    GpsLog::factory()->create(['dev_eui' => $this->device->dev_eui, 'recorded_at' => now()]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/reports/export/fleet-utilization?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('exports speed violations as Excel download', function () {
+    Alert::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'alert_type' => 'overspeed',
+        'triggered_at' => now(),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/reports/export/speed-violations?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('exports cycle time as Excel download', function () {
+    $this->actingAs($this->admin)
+        ->get('/admin/reports/export/cycle-time?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('exports delay & waiting as Excel download', function () {
+    $this->actingAs($this->admin)
+        ->get('/admin/reports/export/delay-waiting?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('exports gateway reliability as Excel download', function () {
+    GpsLog::factory()->create(['dev_eui' => $this->device->dev_eui, 'gateway_id' => 'GW-001', 'recorded_at' => now()]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/reports/export/gateway-reliability?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('denies operator access to Excel exports', function () {
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/export/fleet-utilization')
+        ->assertForbidden();
+
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/export/speed-violations')
+        ->assertForbidden();
+
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/export/cycle-time')
+        ->assertForbidden();
+
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/export/delay-waiting')
+        ->assertForbidden();
+
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/export/gateway-reliability')
+        ->assertForbidden();
+});
