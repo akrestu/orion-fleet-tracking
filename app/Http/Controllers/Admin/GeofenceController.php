@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreGeofenceRequest;
 use App\Http\Requests\Admin\UpdateGeofenceRequest;
 use App\Models\Geofence;
+use App\Models\MapTileset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -29,6 +30,14 @@ class GeofenceController extends Controller
                 'is_active' => $g->is_active,
                 'zone_type' => $g->zone_type,
                 'vertex_count' => count($g->polygon),
+            ]),
+            'tilesets' => MapTileset::orderBy('name')->get()->map(fn (MapTileset $t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'slug' => $t->slug,
+                'min_zoom' => $t->min_zoom,
+                'max_zoom' => $t->max_zoom,
+                'tile_url' => asset("storage/map-tiles/{$t->slug}/{z}/{x}/{y}.png"),
             ]),
         ]);
     }

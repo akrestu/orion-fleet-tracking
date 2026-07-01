@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Models\MapTileset;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,18 +25,37 @@ test('authenticated users can list tilesets', function () {
         ->assertJsonFragment(['name' => 'Site A']);
 });
 
-test('upload requires a name and zip file', function () {
-    $user = User::factory()->create();
+test('non-admin users cannot upload a tileset', function () {
+    $user = User::factory()->create(['role' => UserRole::Operator]);
 
-    $response = $this->actingAs($user)
+    $this->actingAs($user)
+        ->postJson(route('fleet.map.tiles.store'), [])
+        ->assertForbidden();
+});
+
+test('non-admin users cannot delete a tileset', function () {
+    $user = User::factory()->create(['role' => UserRole::Operator]);
+    $tileset = MapTileset::create(['name' => 'Old Map', 'slug' => 'old-map-xyz', 'min_zoom' => 0, 'max_zoom' => 19]);
+
+    $this->actingAs($user)
+        ->deleteJson(route('fleet.map.tiles.destroy', $tileset))
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('map_tilesets', ['id' => $tileset->id]);
+});
+
+test('upload requires a name and zip file', function () {
+    $admin = User::factory()->create(['role' => UserRole::Admin]);
+
+    $response = $this->actingAs($admin)
         ->postJson(route('fleet.map.tiles.store'), []);
 
     expect($response->status())->toBe(422);
 });
 
-test('authenticated users can upload a zip tileset', function () {
+test('admins can upload a zip tileset', function () {
     Storage::fake('public');
-    $user = User::factory()->create();
+    $admin = User::factory()->create(['role' => UserRole::Admin]);
 
     $tmpZip = tempnam(sys_get_temp_dir(), 'tiles').'.zip';
     $zip = new ZipArchive;
@@ -45,7 +65,7 @@ test('authenticated users can upload a zip tileset', function () {
 
     $file = new UploadedFile($tmpZip, 'tiles.zip', 'application/zip', UPLOAD_ERR_OK, true);
 
-    $this->actingAs($user)
+    $this->actingAs($admin)
         ->postJson(route('fleet.map.tiles.store'), [
             'name' => 'Site Tambang',
             'tiles' => $file,
@@ -56,11 +76,11 @@ test('authenticated users can upload a zip tileset', function () {
     $this->assertDatabaseHas('map_tilesets', ['name' => 'Site Tambang']);
 });
 
-test('authenticated users can delete a tileset', function () {
-    $user = User::factory()->create();
+test('admins can delete a tileset', function () {
+    $admin = User::factory()->create(['role' => UserRole::Admin]);
     $tileset = MapTileset::create(['name' => 'Old Map', 'slug' => 'old-map-xyz', 'min_zoom' => 0, 'max_zoom' => 19]);
 
-    $this->actingAs($user)
+    $this->actingAs($admin)
         ->deleteJson(route('fleet.map.tiles.destroy', $tileset))
         ->assertNoContent();
 

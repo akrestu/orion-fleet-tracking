@@ -30,6 +30,7 @@ class DashboardController extends Controller
             }
 
             $devices = $deviceQuery->get();
+            $devicesByEui = $devices->keyBy('dev_eui');
             $onlineDevices = $devices->filter(fn ($d) => $d->status === 'online');
             $allowedEuis = $devices->pluck('dev_eui');
 
@@ -50,8 +51,8 @@ class DashboardController extends Controller
                 ->latest('recorded_at')
                 ->limit(8)
                 ->get()
-                ->map(function ($log) use ($devices) {
-                    $device = $devices->firstWhere('dev_eui', $log->dev_eui);
+                ->map(function ($log) use ($devicesByEui) {
+                    $device = $devicesByEui->get($log->dev_eui);
 
                     return [
                         'device_name' => $device?->device_name ?? $log->dev_eui,
@@ -70,7 +71,7 @@ class DashboardController extends Controller
                 ->groupBy('dev_eui')
                 ->get()
                 ->map(fn ($row) => [
-                    'device_name' => $devices->firstWhere('dev_eui', $row->dev_eui)?->device_name ?? $row->dev_eui,
+                    'device_name' => $devicesByEui->get($row->dev_eui)?->device_name ?? $row->dev_eui,
                     'avg_speed' => round($row->avg_speed, 1),
                     'max_speed' => round($row->max_speed, 1),
                     'log_count' => $row->log_count,

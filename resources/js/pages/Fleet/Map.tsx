@@ -2,7 +2,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { Head, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { LayersControl, MapContainer, TileLayer } from 'react-leaflet';
+import { LayersControl, MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
 
 import { ConnectionBadge } from '@/components/Fleet/ConnectionBadge';
 import { DeviceMarker } from '@/components/Fleet/DeviceMarker';
@@ -36,6 +36,16 @@ interface Props {
 
 const DEFAULT_CENTER: [number, number] = [-3.779223, 103.67939];
 const DEFAULT_ZOOM = 17;
+const BASE_LAYER_STORAGE_KEY = 'orion-map-base-layer';
+const DEFAULT_BASE_LAYER = 'Satelit (Esri)';
+
+function BaseLayerPersistence({ onChange }: { onChange: (name: string) => void }) {
+    useMapEvents({
+        baselayerchange: (e) => onChange(e.name),
+    });
+
+    return null;
+}
 
 export default function FleetMap({
     initialPositions,
@@ -51,6 +61,17 @@ export default function FleetMap({
     const [historyTimeRange, setHistoryTimeRange] = useState<TimeRange>('1h');
     const [mapReady, setMapReady] = useState(false);
     const [tilesets, setTilesets] = useState<Tileset[]>(initialTilesets);
+    const [baseLayer, setBaseLayer] = useState<string>(
+        () => localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER,
+    );
+
+    const handleBaseLayerChange = (name: string) => {
+        setBaseLayer(name);
+        localStorage.setItem(BASE_LAYER_STORAGE_KEY, name);
+    };
+
+    const availableBaseLayers = ['Satelit (Esri)', 'OpenStreetMap', ...tilesets.map((t) => t.name)];
+    const activeBaseLayer = availableBaseLayers.includes(baseLayer) ? baseLayer : DEFAULT_BASE_LAYER;
 
     const { points: routePoints, loading: routeLoading } = useRouteHistory(
         selectedDevEui,
@@ -240,7 +261,7 @@ export default function FleetMap({
                     >
                         <LayersControl position="topright">
                             <LayersControl.BaseLayer
-                                checked
+                                checked={activeBaseLayer === 'Satelit (Esri)'}
                                 name="Satelit (Esri)"
                             >
                                 <TileLayer
@@ -250,7 +271,10 @@ export default function FleetMap({
                                 />
                             </LayersControl.BaseLayer>
 
-                            <LayersControl.BaseLayer name="OpenStreetMap">
+                            <LayersControl.BaseLayer
+                                checked={activeBaseLayer === 'OpenStreetMap'}
+                                name="OpenStreetMap"
+                            >
                                 <TileLayer
                                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -260,6 +284,7 @@ export default function FleetMap({
                             {tilesets.map((tileset) => (
                                 <LayersControl.BaseLayer
                                     key={tileset.id}
+                                    checked={activeBaseLayer === tileset.name}
                                     name={tileset.name}
                                 >
                                     <TileLayer
@@ -271,6 +296,8 @@ export default function FleetMap({
                                 </LayersControl.BaseLayer>
                             ))}
                         </LayersControl>
+
+                        <BaseLayerPersistence onChange={handleBaseLayerChange} />
 
                         <GeofenceLayer geofences={geofences} />
                         <RouteHistoryLayer points={routePoints} />

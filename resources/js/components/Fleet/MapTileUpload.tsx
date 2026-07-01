@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
 import { Trash2Icon, UploadCloudIcon } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -34,50 +34,74 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
     const [name, setName] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
+    const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
         if (!file || !name.trim()) {
             return;
         }
 
         setUploading(true);
+        setProgress(0);
         setError(null);
 
         const form = new FormData();
         form.append('name', name.trim());
         form.append('tiles', file);
 
-        try {
-            const res = await fetch('/fleet/map/tiles', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
-                },
-                body: form,
-            });
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/fleet/map/tiles');
+        xhr.setRequestHeader('X-CSRF-TOKEN', (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '');
+        xhr.responseType = 'json';
 
-            if (!res.ok) {
-                const data = await res.json();
-                setError(data.message ?? 'Upload gagal.');
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                setProgress(Math.round((event.loaded / event.total) * 100));
+            }
+        };
+
+        xhr.onload = () => {
+            setUploading(false);
+
+            if (xhr.status >= 200 && xhr.status < 300) {
+                const tileset: Tileset = xhr.response;
+                onUploaded(tileset);
+                setName('');
+                setFile(null);
+
+                if (fileRef.current) {
+                    fileRef.current.value = '';
+                }
+
+                setOpen(false);
+
                 return;
             }
 
-            const tileset: Tileset = await res.json();
-            onUploaded(tileset);
-            setName('');
-            setFile(null);
-            if (fileRef.current) {
-                fileRef.current.value = '';
+            if (xhr.status === 413) {
+                setError('File terlalu besar untuk diterima server (batas ukuran upload server terlampaui).');
+
+                return;
             }
-            setOpen(false);
-        } catch {
-            setError('Terjadi kesalahan jaringan.');
-        } finally {
+
+            setError(xhr.response?.message ?? `Upload gagal (HTTP ${xhr.status}).`);
+        };
+
+        xhr.onerror = () => {
             setUploading(false);
-        }
+            setError('Koneksi ke server terputus saat upload. Coba lagi.');
+        };
+
+        xhr.ontimeout = () => {
+            setUploading(false);
+            setError('Upload timeout. File mungkin terlalu besar atau koneksi lambat.');
+        };
+
+        xhr.send(form);
     };
 
     const handleDelete = async (tileset: Tileset) => {
@@ -159,11 +183,23 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
                         </p>
                     </div>
 
+                    {uploading && (
+                        <div className="space-y-1">
+                            <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+                                <div
+                                    className="bg-primary h-full transition-all"
+                                    style={{ width: `${progress}%` }}
+                                />
+                            </div>
+                            <p className="text-muted-foreground text-xs">{progress}%</p>
+                        </div>
+                    )}
+
                     {error && <p className="text-destructive text-xs">{error}</p>}
 
                     <DialogFooter>
                         <Button type="submit" disabled={uploading || !name.trim() || !file} className="w-full">
-                            {uploading ? 'Mengupload...' : 'Upload Peta'}
+                            {uploading ? `Mengupload... ${progress}%` : 'Upload Peta'}
                         </Button>
                     </DialogFooter>
                 </form>

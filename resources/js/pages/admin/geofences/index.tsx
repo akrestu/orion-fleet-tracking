@@ -3,7 +3,9 @@ import 'leaflet/dist/leaflet.css';
 import { Head, useForm } from '@inertiajs/react';
 import { MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { MapContainer, Polygon, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { LayersControl, MapContainer, Polygon, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import GeofenceController from '@/actions/App/Http/Controllers/Admin/GeofenceController';
+import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,7 +30,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { index as adminGeofencesIndex } from '@/routes/admin/geofences';
-import GeofenceController from '@/actions/App/Http/Controllers/Admin/GeofenceController';
 
 type LatLng = { lat: number; lng: number };
 
@@ -47,7 +48,11 @@ type GeofenceRow = {
 
 type PageProps = {
     geofences: GeofenceRow[];
+    tilesets: Tileset[];
 };
+
+const BASE_LAYER_STORAGE_KEY = 'orion-map-base-layer';
+const DEFAULT_BASE_LAYER = 'Satelit (Esri)';
 
 const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
     none: 'General',
@@ -68,8 +73,10 @@ function MapInvalidator() {
     const map = useMap();
     useEffect(() => {
         const id = setTimeout(() => map.invalidateSize(), 100);
+
         return () => clearTimeout(id);
     }, [map]);
+
     return null;
 }
 
@@ -87,7 +94,9 @@ function PolygonDrawer({
         },
     });
 
-    if (points.length === 0) return null;
+    if (points.length === 0) {
+return null;
+}
 
     return (
         <Polygon
@@ -104,23 +113,37 @@ function PolygonMapDialog({
     open,
     initialPoints,
     color,
+    tilesets,
     onClose,
     onConfirm,
 }: {
     open: boolean;
     initialPoints: LatLng[];
     color: string;
+    tilesets: Tileset[];
     onClose: () => void;
     onConfirm: (points: LatLng[]) => void;
 }) {
     const [points, setPoints] = useState<LatLng[]>(initialPoints);
 
     useEffect(() => {
-        if (open) setPoints(initialPoints);
+        if (open) {
+setPoints(initialPoints);
+}
     }, [open]);
 
+    const activeBaseLayer = (() => {
+        const saved = localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER;
+        const available = ['Satelit (Esri)', 'OpenStreetMap', ...tilesets.map((t) => t.name)];
+
+        return available.includes(saved) ? saved : DEFAULT_BASE_LAYER;
+    })();
+
     const handleConfirm = () => {
-        if (points.length < 3) return;
+        if (points.length < 3) {
+return;
+}
+
         onConfirm(points);
     };
 
@@ -141,11 +164,43 @@ function PolygonMapDialog({
                         style={{ height: '100%', width: '100%' }}
                         zoomControl
                     >
-                        <TileLayer
-                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                            attribution="Tiles &copy; Esri"
-                            maxZoom={19}
-                        />
+                        <LayersControl position="topright">
+                            <LayersControl.BaseLayer
+                                checked={activeBaseLayer === 'Satelit (Esri)'}
+                                name="Satelit (Esri)"
+                            >
+                                <TileLayer
+                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                    attribution="Tiles &copy; Esri"
+                                    maxZoom={19}
+                                />
+                            </LayersControl.BaseLayer>
+
+                            <LayersControl.BaseLayer
+                                checked={activeBaseLayer === 'OpenStreetMap'}
+                                name="OpenStreetMap"
+                            >
+                                <TileLayer
+                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                />
+                            </LayersControl.BaseLayer>
+
+                            {tilesets.map((tileset) => (
+                                <LayersControl.BaseLayer
+                                    key={tileset.id}
+                                    checked={activeBaseLayer === tileset.name}
+                                    name={tileset.name}
+                                >
+                                    <TileLayer
+                                        url={tileset.tile_url}
+                                        attribution={`Peta kustom: ${tileset.name}`}
+                                        minZoom={tileset.min_zoom}
+                                        maxZoom={tileset.max_zoom}
+                                    />
+                                </LayersControl.BaseLayer>
+                            ))}
+                        </LayersControl>
                         <MapInvalidator />
                         <PolygonDrawer
                             points={points}
@@ -288,7 +343,7 @@ function GeofenceFormFields({
 }
 
 // ---- Create dialog ----
-function CreateGeofenceDialog() {
+function CreateGeofenceDialog({ tilesets }: { tilesets: Tileset[] }) {
     const [open, setOpen] = useState(false);
     const [mapOpen, setMapOpen] = useState(false);
 
@@ -323,7 +378,10 @@ function CreateGeofenceDialog() {
                 open={mapOpen}
                 initialPoints={data.polygon}
                 color={data.color}
-                onClose={() => { setMapOpen(false); setOpen(true); }}
+                tilesets={tilesets}
+                onClose={() => {
+ setMapOpen(false); setOpen(true); 
+}}
                 onConfirm={(pts) => {
                     setData('polygon', pts);
                     setMapOpen(false);
@@ -331,7 +389,13 @@ function CreateGeofenceDialog() {
                 }}
             />
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog open={open} onOpenChange={(v) => {
+ setOpen(v);
+
+ if (!v) {
+reset();
+} 
+}}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Add Geofence Zone</DialogTitle>
@@ -343,7 +407,9 @@ function CreateGeofenceDialog() {
                             data={data}
                             setData={(k, v) => setData(k, v as never)}
                             errors={errors}
-                            onDrawClick={() => { setOpen(false); setMapOpen(true); }}
+                            onDrawClick={() => {
+ setOpen(false); setMapOpen(true); 
+}}
                         />
                     </form>
 
@@ -360,7 +426,7 @@ function CreateGeofenceDialog() {
 }
 
 // ---- Edit dialog ----
-function EditGeofenceDialog({ geofence }: { geofence: GeofenceRow }) {
+function EditGeofenceDialog({ geofence, tilesets }: { geofence: GeofenceRow; tilesets: Tileset[] }) {
     const [open, setOpen] = useState(false);
     const [mapOpen, setMapOpen] = useState(false);
 
@@ -404,7 +470,10 @@ function EditGeofenceDialog({ geofence }: { geofence: GeofenceRow }) {
                 open={mapOpen}
                 initialPoints={data.polygon}
                 color={data.color}
-                onClose={() => { setMapOpen(false); setOpen(true); }}
+                tilesets={tilesets}
+                onClose={() => {
+ setMapOpen(false); setOpen(true); 
+}}
                 onConfirm={(pts) => {
                     setData('polygon', pts);
                     setMapOpen(false);
@@ -412,7 +481,13 @@ function EditGeofenceDialog({ geofence }: { geofence: GeofenceRow }) {
                 }}
             />
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog open={open} onOpenChange={(v) => {
+ setOpen(v);
+
+ if (!v) {
+reset();
+} 
+}}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit Geofence Zone</DialogTitle>
@@ -424,7 +499,9 @@ function EditGeofenceDialog({ geofence }: { geofence: GeofenceRow }) {
                             data={data}
                             setData={(k, v) => setData(k, v as never)}
                             errors={errors}
-                            onDrawClick={() => { setOpen(false); setMapOpen(true); }}
+                            onDrawClick={() => {
+ setOpen(false); setMapOpen(true); 
+}}
                         />
                     </form>
 
@@ -487,7 +564,7 @@ function DeleteGeofenceDialog({ geofence }: { geofence: GeofenceRow }) {
 }
 
 // ---- Page ----
-export default function GeofencesIndex({ geofences }: PageProps) {
+export default function GeofencesIndex({ geofences, tilesets }: PageProps) {
     return (
         <>
             <Head title="Geofences" />
@@ -500,7 +577,7 @@ export default function GeofencesIndex({ geofences }: PageProps) {
                             Draw polygon zones on the map. Set zone type (Loading/Dumping/Parking) to enable Cycle Time detection.
                         </p>
                     </div>
-                    <CreateGeofenceDialog />
+                    <CreateGeofenceDialog tilesets={tilesets} />
                 </div>
 
                 <div className="rounded-md border">
@@ -556,7 +633,7 @@ export default function GeofencesIndex({ geofences }: PageProps) {
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center justify-end gap-1">
-                                                <EditGeofenceDialog geofence={g} />
+                                                <EditGeofenceDialog geofence={g} tilesets={tilesets} />
                                                 <DeleteGeofenceDialog geofence={g} />
                                             </div>
                                         </TableCell>

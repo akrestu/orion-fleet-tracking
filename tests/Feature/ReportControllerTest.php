@@ -2,6 +2,7 @@
 
 use App\Models\Alert;
 use App\Models\Device;
+use App\Models\Geofence;
 use App\Models\GpsLog;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -134,6 +135,59 @@ it('denies operator access to CSV exports', function () {
     $this->actingAs($this->operator)
         ->get('/admin/reports/export/alerts')
         ->assertForbidden();
+});
+
+// --- Cycle time ---
+
+it('detects a completed loading-dumping-loading cycle', function () {
+    Geofence::factory()->create([
+        'zone_type' => 'loading',
+        'polygon' => [
+            ['lat' => 1.001, 'lng' => 0.999],
+            ['lat' => 1.001, 'lng' => 1.001],
+            ['lat' => 0.999, 'lng' => 1.001],
+            ['lat' => 0.999, 'lng' => 0.999],
+        ],
+    ]);
+    Geofence::factory()->create([
+        'zone_type' => 'dumping',
+        'polygon' => [
+            ['lat' => 2.001, 'lng' => 1.999],
+            ['lat' => 2.001, 'lng' => 2.001],
+            ['lat' => 1.999, 'lng' => 2.001],
+            ['lat' => 1.999, 'lng' => 1.999],
+        ],
+    ]);
+
+    $start = now()->subHours(2);
+
+    GpsLog::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'latitude' => 1.0,
+        'longitude' => 1.0,
+        'recorded_at' => $start,
+    ]);
+    GpsLog::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'latitude' => 2.0,
+        'longitude' => 2.0,
+        'recorded_at' => $start->copy()->addMinutes(10),
+    ]);
+    GpsLog::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'latitude' => 1.0,
+        'longitude' => 1.0,
+        'recorded_at' => $start->copy()->addMinutes(20),
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->getJson('/admin/reports/cycle-time?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk();
+
+    $trips = $response->json('trips');
+    expect($trips)->toHaveCount(1)
+        ->and($trips[0]['cycle_duration_min'])->toBe(20)
+        ->and($trips[0]['haul_duration_min'])->toBe(10);
 });
 
 // --- Delay & waiting time ---

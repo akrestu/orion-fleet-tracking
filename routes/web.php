@@ -20,6 +20,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('fleet/map', MapController::class)->name('fleet.map');
     Route::get('fleet/map/tiles', [MapTileController::class, 'index'])->name('fleet.map.tiles.index');
+});
+
+Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
     Route::post('fleet/map/tiles', [MapTileController::class, 'store'])->name('fleet.map.tiles.store');
     Route::delete('fleet/map/tiles/{tileset}', [MapTileController::class, 'destroy'])->name('fleet.map.tiles.destroy');
 });
