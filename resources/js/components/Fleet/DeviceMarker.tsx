@@ -1,8 +1,10 @@
 import L from 'leaflet';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
 import { UNIT_CATEGORIES } from '@/config/unit-types';
 import type { UnitCategory } from '@/config/unit-types';
+import { useTick } from '@/hooks/use-tick';
+import { formatRelativeTime, isStale } from '@/lib/time';
 import type { DevicePosition } from '@/types/fleet';
 
 const PNG_ICONS: Partial<Record<UnitCategory, string>> = {
@@ -86,8 +88,28 @@ function createDeviceIcon(device: DevicePosition): L.DivIcon {
     const isOnline = device.status === 'online';
     const heading = device.heading_deg ?? 0;
     const pngSrc = PNG_ICONS[device.unit_type];
-    const opacity = isOnline ? '1' : '0.65';
+    const opacity = isOnline ? '1' : '0.55';
+    const grayscale = isOnline ? '' : 'grayscale(0.85) ';
     const label = device.device_name ?? cat.abbr;
+
+    const labelBg = isOnline ? 'rgba(0,0,0,0.65)' : 'rgba(100,100,100,0.55)';
+    const labelHtml = `
+        <div style="
+            margin-top:2px;
+            background:${labelBg};
+            color:#fff;
+            font-size:10px;
+            font-weight:700;
+            font-family:sans-serif;
+            padding:1px 5px;
+            border-radius:4px;
+            white-space:nowrap;
+            pointer-events:none;
+            letter-spacing:0.3px;
+            display:flex;
+            align-items:center;
+            gap:3px;
+        ">${isOnline ? '' : '<span style="opacity:0.75;">⏸</span>'}${label}</div>`;
 
     let iconHtml: string;
     let iconW: number;
@@ -101,23 +123,11 @@ function createDeviceIcon(device: DevicePosition): L.DivIcon {
         iconW = PNG_SIZE;
         iconH = PNG_SIZE + 16;
         iconHtml = `
-            <div style="display:flex;flex-direction:column;align-items:center;opacity:${opacity};">
-                <div style="${glow};transform:${flipX};">
+            <div style="display:flex;flex-direction:column;align-items:center;opacity:${opacity};filter:${grayscale};">
+                <div style="${glow}transform:${flipX};">
                     <img src="${pngSrc}" style="display:block;width:${PNG_SIZE}px!important;height:${PNG_SIZE}px!important;max-width:${PNG_SIZE}px!important;min-width:${PNG_SIZE}px!important;"/>
                 </div>
-                <div style="
-                    margin-top:2px;
-                    background:rgba(0,0,0,0.65);
-                    color:#fff;
-                    font-size:10px;
-                    font-weight:700;
-                    font-family:sans-serif;
-                    padding:1px 5px;
-                    border-radius:4px;
-                    white-space:nowrap;
-                    pointer-events:none;
-                    letter-spacing:0.3px;
-                ">${label}</div>
+                ${labelHtml}
             </div>`;
     } else {
         const { svg, w, h } = buildVehicleSvg(device.unit_type, color, dark);
@@ -125,21 +135,9 @@ function createDeviceIcon(device: DevicePosition): L.DivIcon {
         iconH = h + 16;
         const glow = isOnline ? `filter:drop-shadow(0 0 5px ${color}cc);` : '';
         iconHtml = `
-            <div style="display:flex;flex-direction:column;align-items:center;opacity:${opacity};">
+            <div style="display:flex;flex-direction:column;align-items:center;opacity:${opacity};filter:${grayscale};">
                 <div style="transform:rotate(${heading}deg);transform-origin:${w / 2}px ${h / 2}px;display:inline-block;${glow}">${svg}</div>
-                <div style="
-                    margin-top:2px;
-                    background:rgba(0,0,0,0.65);
-                    color:#fff;
-                    font-size:10px;
-                    font-weight:700;
-                    font-family:sans-serif;
-                    padding:1px 5px;
-                    border-radius:4px;
-                    white-space:nowrap;
-                    pointer-events:none;
-                    letter-spacing:0.3px;
-                ">${label}</div>
+                ${labelHtml}
             </div>`;
     }
 
@@ -160,22 +158,63 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
     const map = useMap();
     const markerRef = useRef<L.Marker>(null);
     const cat = UNIT_CATEGORIES[device.unit_type] ?? UNIT_CATEGORIES.other;
+    const isOnline = device.status === 'online';
+    useTick();
+    const lastUpdate = formatRelativeTime(device.recorded_at);
+    const stale = isOnline && isStale(device.recorded_at);
+
+    const positionRef = useRef<[number, number]>([
+        device.latitude,
+        device.longitude,
+    ]);
 
     useEffect(() => {
+        positionRef.current = [device.latitude, device.longitude];
+    });
+
+    // Fly to the unit only when it becomes selected, not on every live position update —
+    // otherwise a moving, selected unit would keep interrupting its own flyTo animation.
+    useEffect(() => {
         if (isSelected) {
-            map.panTo([device.latitude, device.longitude], { animate: true });
+            map.flyTo(positionRef.current, map.getZoom(), { duration: 0.75 });
         }
-    }, [isSelected, device.latitude, device.longitude, map]);
+    }, [isSelected, map]);
+
+    const icon = useMemo(
+        () => createDeviceIcon(device),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [
+            device.status,
+            device.unit_type,
+            device.device_name,
+            device.heading_deg,
+        ],
+    );
 
     return (
         <Marker
             ref={markerRef}
             position={[device.latitude, device.longitude]}
-            icon={createDeviceIcon(device)}
+            icon={icon}
+            title={device.status}
         >
             <Popup>
                 <div className="min-w-[160px] text-sm">
-                    <p className="font-semibold">{device.device_name}</p>
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="font-semibold">{device.device_name}</p>
+                        <span
+                            className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                                isOnline
+                                    ? 'bg-emerald-500/15 text-emerald-600'
+                                    : 'bg-slate-400/15 text-slate-500'
+                            }`}
+                        >
+                            <span
+                                className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`}
+                            />
+                            {isOnline ? 'Online' : 'Offline'}
+                        </span>
+                    </div>
                     {device.unit_model && (
                         <p className="text-xs text-slate-500">
                             {device.unit_model}
@@ -201,6 +240,14 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
                             ? ` · ${device.heading_deg}°`
                             : ''}
                     </p>
+                    {lastUpdate && (
+                        <p
+                            className={`mt-1 text-xs ${stale ? 'font-medium text-amber-600' : 'text-slate-400'}`}
+                        >
+                            {stale && '⚠ '}
+                            Update terakhir: {lastUpdate}
+                        </p>
+                    )}
                     {(device.rssi !== null || device.snr !== null) && (
                         <p className="text-xs text-slate-400">
                             {device.rssi !== null && `RSSI: ${device.rssi} dBm`}

@@ -1,8 +1,15 @@
 import 'leaflet/dist/leaflet.css';
 
 import { Head, usePage } from '@inertiajs/react';
-import { useState } from 'react';
-import { LayersControl, MapContainer, TileLayer, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+import { useEffect, useRef, useState } from 'react';
+import {
+    LayersControl,
+    MapContainer,
+    TileLayer,
+    useMap,
+    useMapEvents,
+} from 'react-leaflet';
 
 import { ConnectionBadge } from '@/components/Fleet/ConnectionBadge';
 import { DeviceMarker } from '@/components/Fleet/DeviceMarker';
@@ -39,7 +46,39 @@ const DEFAULT_ZOOM = 17;
 const BASE_LAYER_STORAGE_KEY = 'orion-map-base-layer';
 const DEFAULT_BASE_LAYER = 'Satelit (Esri)';
 
-function BaseLayerPersistence({ onChange }: { onChange: (name: string) => void }) {
+/** Frames the map to fit every known unit once, as soon as any unit has a real GPS fix — then never re-runs. */
+function FitBoundsOnLoad({ positions }: { positions: DevicePosition[] }) {
+    const map = useMap();
+    const hasFitted = useRef(false);
+
+    useEffect(() => {
+        if (hasFitted.current || positions.length === 0) {
+            return;
+        }
+
+        const validPositions = positions.filter(
+            (d) => d.latitude !== 0 && d.longitude !== 0,
+        );
+
+        if (validPositions.length === 0) {
+            return;
+        }
+
+        hasFitted.current = true;
+        const bounds = L.latLngBounds(
+            validPositions.map((d) => [d.latitude, d.longitude]),
+        );
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 18 });
+    }, [positions, map]);
+
+    return null;
+}
+
+function BaseLayerPersistence({
+    onChange,
+}: {
+    onChange: (name: string) => void;
+}) {
     useMapEvents({
         baselayerchange: (e) => onChange(e.name),
     });
@@ -58,11 +97,15 @@ export default function FleetMap({
         auth.accessibleGroupIds,
     );
     const [selectedDevEui, setSelectedDevEui] = useState<string | null>(null);
+    const [statusFilter, setStatusFilter] = useState<
+        'all' | 'online' | 'offline'
+    >('all');
     const [historyTimeRange, setHistoryTimeRange] = useState<TimeRange>('1h');
     const [mapReady, setMapReady] = useState(false);
     const [tilesets, setTilesets] = useState<Tileset[]>(initialTilesets);
     const [baseLayer, setBaseLayer] = useState<string>(
-        () => localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER,
+        () =>
+            localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER,
     );
 
     const handleBaseLayerChange = (name: string) => {
@@ -70,8 +113,14 @@ export default function FleetMap({
         localStorage.setItem(BASE_LAYER_STORAGE_KEY, name);
     };
 
-    const availableBaseLayers = ['Satelit (Esri)', 'OpenStreetMap', ...tilesets.map((t) => t.name)];
-    const activeBaseLayer = availableBaseLayers.includes(baseLayer) ? baseLayer : DEFAULT_BASE_LAYER;
+    const availableBaseLayers = [
+        'Satelit (Esri)',
+        'OpenStreetMap',
+        ...tilesets.map((t) => t.name),
+    ];
+    const activeBaseLayer = availableBaseLayers.includes(baseLayer)
+        ? baseLayer
+        : DEFAULT_BASE_LAYER;
 
     const { points: routePoints, loading: routeLoading } = useRouteHistory(
         selectedDevEui,
@@ -97,6 +146,19 @@ export default function FleetMap({
     const onlineCount = positionList.filter(
         (d) => d.status === 'online',
     ).length;
+    const offlineCount = positionList.length - onlineCount;
+
+    const visiblePositions = positionList.filter((d) => {
+        if (statusFilter === 'online') {
+            return d.status === 'online';
+        }
+
+        if (statusFilter === 'offline') {
+            return d.status !== 'online';
+        }
+
+        return true;
+    });
 
     return (
         <>
@@ -113,24 +175,55 @@ export default function FleetMap({
                         <ConnectionBadge connected={isConnected} />
                     </div>
 
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 gap-2 border-b border-border px-4 py-3">
-                        <div className="rounded-md bg-muted px-3 py-2">
+                    {/* Stats / filter status — juga berfungsi sebagai legenda */}
+                    <div className="grid grid-cols-3 gap-1.5 border-b border-border px-4 py-3">
+                        <button
+                            onClick={() => setStatusFilter('all')}
+                            className={`rounded-md px-2 py-2 text-left transition-colors ${
+                                statusFilter === 'all'
+                                    ? 'bg-muted ring-1 ring-border'
+                                    : 'bg-muted/50 hover:bg-muted'
+                            }`}
+                        >
                             <p className="text-xs text-muted-foreground">
-                                Total
+                                Semua
                             </p>
-                            <p className="text-xl font-bold text-foreground">
+                            <p className="text-lg font-bold text-foreground">
                                 {positionList.length}
                             </p>
-                        </div>
-                        <div className="rounded-md bg-emerald-500/10 px-3 py-2">
-                            <p className="text-xs text-emerald-600 dark:text-emerald-500">
+                        </button>
+                        <button
+                            onClick={() => setStatusFilter('online')}
+                            className={`rounded-md px-2 py-2 text-left transition-colors ${
+                                statusFilter === 'online'
+                                    ? 'bg-emerald-500/15 ring-1 ring-emerald-500/40'
+                                    : 'bg-emerald-500/5 hover:bg-emerald-500/10'
+                            }`}
+                        >
+                            <p className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-500">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                 Online
                             </p>
-                            <p className="text-xl font-bold text-emerald-500 dark:text-emerald-400">
+                            <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400">
                                 {onlineCount}
                             </p>
-                        </div>
+                        </button>
+                        <button
+                            onClick={() => setStatusFilter('offline')}
+                            className={`rounded-md px-2 py-2 text-left transition-colors ${
+                                statusFilter === 'offline'
+                                    ? 'bg-slate-400/15 ring-1 ring-slate-400/40'
+                                    : 'bg-slate-400/5 hover:bg-slate-400/10'
+                            }`}
+                        >
+                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                                Offline
+                            </p>
+                            <p className="text-lg font-bold text-slate-500 dark:text-slate-400">
+                                {offlineCount}
+                            </p>
+                        </button>
                     </div>
 
                     {/* Signal heatmap toggle */}
@@ -213,8 +306,12 @@ export default function FleetMap({
                                 <Skeleton className="h-16 w-full" />
                                 <Skeleton className="h-16 w-full" />
                             </div>
+                        ) : visiblePositions.length === 0 ? (
+                            <p className="p-4 text-center text-xs text-muted-foreground">
+                                Tidak ada unit dengan status ini.
+                            </p>
                         ) : (
-                            positionList.map((device) => (
+                            visiblePositions.map((device) => (
                                 <DeviceSidebarItem
                                     key={device.dev_eui}
                                     device={device}
@@ -297,7 +394,10 @@ export default function FleetMap({
                             ))}
                         </LayersControl>
 
-                        <BaseLayerPersistence onChange={handleBaseLayerChange} />
+                        <BaseLayerPersistence
+                            onChange={handleBaseLayerChange}
+                        />
+                        <FitBoundsOnLoad positions={positionList} />
 
                         <GeofenceLayer geofences={geofences} />
                         <RouteHistoryLayer points={routePoints} />
@@ -305,7 +405,7 @@ export default function FleetMap({
                             <SignalHeatmapLayer timeRange={heatmapTimeRange} />
                         )}
 
-                        {positionList
+                        {visiblePositions
                             .filter(
                                 (d) => d.latitude !== 0 && d.longitude !== 0,
                             )
