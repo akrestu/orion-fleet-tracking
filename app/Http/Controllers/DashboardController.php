@@ -6,6 +6,7 @@ use App\Models\Alert;
 use App\Models\Device;
 use App\Models\GpsLog;
 use App\Models\User;
+use App\Services\FleetUtilizationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly FleetUtilizationService $fleetUtilizationService) {}
+
     public function __invoke(): Response
     {
         /** @var User $user */
@@ -45,7 +48,8 @@ class DashboardController extends Controller
             $unitTypeCounts = $devices
                 ->groupBy('unit_type')
                 ->map->count()
-                ->sortDesc();
+                ->sortDesc()
+                ->toArray();
 
             $recentActivity = GpsLog::whereIn('dev_eui', $allowedEuis)
                 ->latest('recorded_at')
@@ -88,7 +92,7 @@ class DashboardController extends Controller
 
             $alertSummary = collect($alertTypes)->mapWithKeys(fn ($type) => [
                 $type => (int) ($alertCounts[$type] ?? 0),
-            ]);
+            ])->toArray();
 
             // Fleet productivity today — per-device: distance = avg_speed × log_count × 30s interval.
             // Summed across fleet to give total km travelled and operating hours.
@@ -130,6 +134,39 @@ class DashboardController extends Controller
                 ])
                 ->values()->toArray();
 
+            // Maintenance insight — fleet-wide running vs idle hours today.
+            $runningHours = 0.0;
+            $idleHours = 0.0;
+            foreach ($allowedEuis as $devEui) {
+                $stats = $this->fleetUtilizationService->computeForDevice($devEui, today(), today());
+                if ($stats !== null) {
+                    $runningHours += $stats['running_hours'];
+                    $idleHours += $stats['idle_hours'];
+                }
+            }
+
+            $maintenance = [
+                'running_hours' => round($runningHours, 1),
+                'idle_hours' => round($idleHours, 1),
+            ];
+
+            // Infrastructure coverage — avg signal quality per gateway today (top 5 by traffic).
+            $gatewaySignal = GpsLog::where('recorded_at', '>=', today())
+                ->whereIn('dev_eui', $allowedEuis)
+                ->whereNotNull('gateway_id')
+                ->selectRaw('gateway_id, AVG(rssi) as avg_rssi, AVG(snr) as avg_snr, COUNT(*) as uplink_count')
+                ->groupBy('gateway_id')
+                ->orderByDesc('uplink_count')
+                ->limit(5)
+                ->get()
+                ->map(fn ($row) => [
+                    'gateway_id' => $row->gateway_id,
+                    'avg_rssi' => round((float) $row->avg_rssi, 1),
+                    'avg_snr' => round((float) $row->avg_snr, 1),
+                    'uplink_count' => (int) $row->uplink_count,
+                ])
+                ->values()->toArray();
+
             return [
                 'stats' => [
                     'totalDevices' => $devices->count(),
@@ -144,6 +181,8 @@ class DashboardController extends Controller
                 'alertSummary' => $alertSummary,
                 'productivity' => $productivity,
                 'speedTrend' => $speedTrend,
+                'maintenance' => $maintenance,
+                'gatewaySignal' => $gatewaySignal,
             ];
         });
 

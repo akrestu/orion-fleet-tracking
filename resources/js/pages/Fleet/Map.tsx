@@ -2,6 +2,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { Head, usePage } from '@inertiajs/react';
 import L from 'leaflet';
+import { Menu } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
     LayersControl,
@@ -19,9 +20,14 @@ import { MapTileUpload } from '@/components/Fleet/MapTileUpload';
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import { RouteHistoryLayer } from '@/components/Fleet/RouteHistoryLayer';
 import { SignalHeatmapLayer } from '@/components/Fleet/SignalHeatmapLayer';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Toggle } from '@/components/ui/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useFleetTracking } from '@/hooks/use-fleet-tracking';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useRouteHistory } from '@/hooks/useRouteHistory';
 import type { TimeRange } from '@/hooks/useRouteHistory';
 import fleet from '@/routes/fleet';
@@ -96,6 +102,8 @@ export default function FleetMap({
         initialPositions,
         auth.accessibleGroupIds,
     );
+    const isMobile = useIsMobile();
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedDevEui, setSelectedDevEui] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState<
         'all' | 'online' | 'offline'
@@ -160,175 +168,226 @@ export default function FleetMap({
         return true;
     });
 
+    const sidebarContent = (
+        <>
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                    Devices
+                </p>
+                <ConnectionBadge connected={isConnected} />
+            </div>
+
+            {/* Stats / filter status — juga berfungsi sebagai legenda */}
+            <ToggleGroup
+                type="single"
+                value={statusFilter}
+                onValueChange={(value) => {
+                    if (value) {
+                        setStatusFilter(value as typeof statusFilter);
+                    }
+                }}
+                className="grid grid-cols-3 gap-1.5 border-b border-border px-4 py-3"
+            >
+                <ToggleGroupItem
+                    value="all"
+                    aria-label="Tampilkan semua unit"
+                    className="h-auto flex-col items-start gap-0 rounded-md! bg-muted/50 px-2 py-2 text-left hover:bg-muted data-[state=on]:bg-muted data-[state=on]:text-foreground data-[state=on]:ring-1 data-[state=on]:ring-border"
+                >
+                    <p className="text-xs text-muted-foreground">Semua</p>
+                    <p className="text-lg font-bold text-foreground">
+                        {positionList.length}
+                    </p>
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                    value="online"
+                    aria-label="Tampilkan unit online"
+                    className="h-auto flex-col items-start gap-0 rounded-md! bg-status-online/5 px-2 py-2 text-left hover:bg-status-online/10 data-[state=on]:bg-status-online/15 data-[state=on]:text-status-online data-[state=on]:ring-1 data-[state=on]:ring-status-online/40"
+                >
+                    <p className="flex items-center gap-1 text-xs text-status-online">
+                        <span className="h-1.5 w-1.5 rounded-full bg-status-online" />
+                        Online
+                    </p>
+                    <p className="text-lg font-bold text-status-online">
+                        {onlineCount}
+                    </p>
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                    value="offline"
+                    aria-label="Tampilkan unit offline"
+                    className="h-auto flex-col items-start gap-0 rounded-md! bg-status-offline/5 px-2 py-2 text-left hover:bg-status-offline/10 data-[state=on]:bg-status-offline/15 data-[state=on]:text-status-offline data-[state=on]:ring-1 data-[state=on]:ring-status-offline/40"
+                >
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="h-1.5 w-1.5 rounded-full bg-status-offline" />
+                        Offline
+                    </p>
+                    <p className="text-lg font-bold text-status-offline">
+                        {offlineCount}
+                    </p>
+                </ToggleGroupItem>
+            </ToggleGroup>
+
+            {/* Signal heatmap toggle */}
+            <div className="border-b border-border px-4 py-2">
+                <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                        Coverage Sinyal
+                    </p>
+                    <Toggle
+                        size="sm"
+                        pressed={showHeatmap}
+                        onPressedChange={setShowHeatmap}
+                        aria-label="Aktifkan heatmap coverage sinyal"
+                        className="h-auto rounded px-2 py-0.5 text-xs font-medium data-[state=on]:bg-violet-500 data-[state=on]:text-white"
+                    >
+                        {showHeatmap ? 'Aktif' : 'Nonaktif'}
+                    </Toggle>
+                </div>
+                {showHeatmap && (
+                    <ToggleGroup
+                        type="single"
+                        value={heatmapTimeRange}
+                        onValueChange={(value) => {
+                            if (value) {
+                                setHeatmapTimeRange(
+                                    value as typeof heatmapTimeRange,
+                                );
+                            }
+                        }}
+                        className="mt-1.5 flex gap-1"
+                    >
+                        {(['24h', '7d'] as const).map((r) => (
+                            <ToggleGroupItem
+                                key={r}
+                                value={r}
+                                aria-label={`Rentang waktu ${r === '24h' ? '24 jam' : '7 hari'}`}
+                                className="h-auto rounded! px-2 py-0.5 text-xs font-medium data-[state=on]:bg-violet-500 data-[state=on]:text-white"
+                            >
+                                {r === '24h' ? '24 Jam' : '7 Hari'}
+                            </ToggleGroupItem>
+                        ))}
+                    </ToggleGroup>
+                )}
+            </div>
+
+            {/* Route history time range — only show when a device is selected */}
+            {selectedDevEui && (
+                <div className="border-b border-border px-4 py-2">
+                    <p className="mb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                        Riwayat Rute{' '}
+                        {routeLoading && (
+                            <span className="opacity-60">(memuat…)</span>
+                        )}
+                    </p>
+                    <ToggleGroup
+                        type="single"
+                        value={historyTimeRange}
+                        onValueChange={(value) => {
+                            if (value) {
+                                setHistoryTimeRange(value as TimeRange);
+                            }
+                        }}
+                        className="flex gap-1"
+                    >
+                        {TIME_RANGE_OPTIONS.map((opt) => (
+                            <ToggleGroupItem
+                                key={opt.value}
+                                value={opt.value}
+                                aria-label={`Riwayat rute ${opt.label}`}
+                                className="h-auto rounded! px-2 py-0.5 text-xs font-medium data-[state=on]:bg-sky-500 data-[state=on]:text-white"
+                            >
+                                {opt.label}
+                            </ToggleGroupItem>
+                        ))}
+                    </ToggleGroup>
+                    {routePoints.length > 0 && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            {routePoints.length} titik GPS
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {/* Device list */}
+            <ScrollArea className="flex-1">
+                {positionList.length === 0 ? (
+                    <div className="space-y-2 p-4">
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                    </div>
+                ) : visiblePositions.length === 0 ? (
+                    <p className="p-4 text-center text-xs text-muted-foreground">
+                        Tidak ada unit dengan status ini.
+                    </p>
+                ) : (
+                    visiblePositions.map((device) => (
+                        <DeviceSidebarItem
+                            key={device.dev_eui}
+                            device={device}
+                            isSelected={selectedDevEui === device.dev_eui}
+                            onClick={() => {
+                                handleSelectDevice(device.dev_eui);
+
+                                if (isMobile) {
+                                    setSidebarOpen(false);
+                                }
+                            }}
+                        />
+                    ))
+                )}
+            </ScrollArea>
+        </>
+    );
+
     return (
         <>
             <Head title="Fleet Map" />
 
+            {/* Screen-reader-only announcement of live connection state — the map
+                itself updates too frequently (per GPS tick) to announce every change. */}
+            <div className="sr-only" aria-live="polite" role="status">
+                {isConnected
+                    ? 'Terhubung ke live tracking'
+                    : 'Terputus dari live tracking, mencoba menyambung kembali'}
+            </div>
+
             <div className="flex min-h-0 w-full flex-1 overflow-hidden">
-                {/* Device list sidebar */}
-                <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
-                    {/* Header */}
-                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                        <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                            Devices
-                        </p>
-                        <ConnectionBadge connected={isConnected} />
-                    </div>
-
-                    {/* Stats / filter status — juga berfungsi sebagai legenda */}
-                    <div className="grid grid-cols-3 gap-1.5 border-b border-border px-4 py-3">
-                        <button
-                            onClick={() => setStatusFilter('all')}
-                            className={`rounded-md px-2 py-2 text-left transition-colors ${
-                                statusFilter === 'all'
-                                    ? 'bg-muted ring-1 ring-border'
-                                    : 'bg-muted/50 hover:bg-muted'
-                            }`}
+                {/* Device list sidebar — inline on desktop, slide-over sheet on mobile */}
+                {isMobile ? (
+                    <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                        <SheetContent
+                            side="left"
+                            className="w-72 gap-0 p-0 sm:max-w-72"
                         >
-                            <p className="text-xs text-muted-foreground">
-                                Semua
-                            </p>
-                            <p className="text-lg font-bold text-foreground">
-                                {positionList.length}
-                            </p>
-                        </button>
-                        <button
-                            onClick={() => setStatusFilter('online')}
-                            className={`rounded-md px-2 py-2 text-left transition-colors ${
-                                statusFilter === 'online'
-                                    ? 'bg-emerald-500/15 ring-1 ring-emerald-500/40'
-                                    : 'bg-emerald-500/5 hover:bg-emerald-500/10'
-                            }`}
-                        >
-                            <p className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-500">
-                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                                Online
-                            </p>
-                            <p className="text-lg font-bold text-emerald-500 dark:text-emerald-400">
-                                {onlineCount}
-                            </p>
-                        </button>
-                        <button
-                            onClick={() => setStatusFilter('offline')}
-                            className={`rounded-md px-2 py-2 text-left transition-colors ${
-                                statusFilter === 'offline'
-                                    ? 'bg-slate-400/15 ring-1 ring-slate-400/40'
-                                    : 'bg-slate-400/5 hover:bg-slate-400/10'
-                            }`}
-                        >
-                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                                Offline
-                            </p>
-                            <p className="text-lg font-bold text-slate-500 dark:text-slate-400">
-                                {offlineCount}
-                            </p>
-                        </button>
-                    </div>
-
-                    {/* Signal heatmap toggle */}
-                    <div className="border-b border-border px-4 py-2">
-                        <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                Coverage Sinyal
-                            </p>
-                            <button
-                                onClick={() => setShowHeatmap((v) => !v)}
-                                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                                    showHeatmap
-                                        ? 'bg-violet-500 text-white'
-                                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                }`}
-                            >
-                                {showHeatmap ? 'Aktif' : 'Nonaktif'}
-                            </button>
-                        </div>
-                        {showHeatmap && (
-                            <div className="mt-1.5 flex gap-1">
-                                {(['24h', '7d'] as const).map((r) => (
-                                    <button
-                                        key={r}
-                                        onClick={() => setHeatmapTimeRange(r)}
-                                        className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                                            heatmapTimeRange === r
-                                                ? 'bg-violet-500 text-white'
-                                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                        }`}
-                                    >
-                                        {r === '24h' ? '24 Jam' : '7 Hari'}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Route history time range — only show when a device is selected */}
-                    {selectedDevEui && (
-                        <div className="border-b border-border px-4 py-2">
-                            <p className="mb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                Riwayat Rute{' '}
-                                {routeLoading && (
-                                    <span className="opacity-60">
-                                        (memuat…)
-                                    </span>
-                                )}
-                            </p>
-                            <div className="flex gap-1">
-                                {TIME_RANGE_OPTIONS.map((opt) => (
-                                    <button
-                                        key={opt.value}
-                                        onClick={() =>
-                                            setHistoryTimeRange(opt.value)
-                                        }
-                                        className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                                            historyTimeRange === opt.value
-                                                ? 'bg-sky-500 text-white'
-                                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                                        }`}
-                                    >
-                                        {opt.label}
-                                    </button>
-                                ))}
-                            </div>
-                            {routePoints.length > 0 && (
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    {routePoints.length} titik GPS
-                                </p>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Device list */}
-                    <ScrollArea className="flex-1">
-                        {positionList.length === 0 ? (
-                            <div className="space-y-2 p-4">
-                                <Skeleton className="h-16 w-full" />
-                                <Skeleton className="h-16 w-full" />
-                                <Skeleton className="h-16 w-full" />
-                            </div>
-                        ) : visiblePositions.length === 0 ? (
-                            <p className="p-4 text-center text-xs text-muted-foreground">
-                                Tidak ada unit dengan status ini.
-                            </p>
-                        ) : (
-                            visiblePositions.map((device) => (
-                                <DeviceSidebarItem
-                                    key={device.dev_eui}
-                                    device={device}
-                                    isSelected={
-                                        selectedDevEui === device.dev_eui
-                                    }
-                                    onClick={() =>
-                                        handleSelectDevice(device.dev_eui)
-                                    }
-                                />
-                            ))
-                        )}
-                    </ScrollArea>
-                </aside>
+                            <SheetTitle className="sr-only">
+                                Daftar Devices
+                            </SheetTitle>
+                            {sidebarContent}
+                        </SheetContent>
+                    </Sheet>
+                ) : (
+                    <aside className="flex w-64 shrink-0 flex-col border-r border-border bg-card">
+                        {sidebarContent}
+                    </aside>
+                )}
 
                 {/* Map */}
                 <main className="relative flex-1">
+                    {isMobile && (
+                        <div className="absolute top-3 left-3 z-[1000]">
+                            <Button
+                                size="icon"
+                                variant="secondary"
+                                className="shadow-md"
+                                aria-label="Buka daftar devices"
+                                onClick={() => setSidebarOpen(true)}
+                            >
+                                <Menu className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    )}
+
                     {!mapReady && (
                         <div className="absolute inset-0 z-10 flex items-center justify-center bg-background">
                             <div className="text-center">

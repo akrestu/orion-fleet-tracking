@@ -1,6 +1,17 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BarChart3, Bell, Cpu, Layers, LayoutGrid, Map, MapPinned, Settings2, SlidersHorizontal, Users } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
+import {
+    BarChart3,
+    Bell,
+    Cpu,
+    Layers,
+    LayoutGrid,
+    Map,
+    MapPinned,
+    Settings2,
+    SlidersHorizontal,
+    Users,
+} from 'lucide-react';
+import { BrandLockup } from '@/components/brand-lockup';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -13,8 +24,8 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import adminAlerts from '@/routes/admin/alerts';
 import adminAlertThresholds from '@/routes/admin/alert-thresholds';
+import adminAlerts from '@/routes/admin/alerts';
 import adminDeviceGroups from '@/routes/admin/device-groups';
 import adminDevices from '@/routes/admin/devices';
 import adminGeofences from '@/routes/admin/geofences';
@@ -90,19 +101,12 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch className="flex items-center gap-0">
-                                {/* Client logo — hidden when sidebar collapses to icon */}
-                                <img
-                                    src="/wbk.png"
-                                    alt="PT. WBK"
-                                    className="h-5 w-5 shrink-0 rounded-md object-cover group-data-[collapsible=icon]:hidden"
-                                />
-                                <div className="mx-1.5 flex flex-col items-center gap-0.5 select-none group-data-[collapsible=icon]:hidden">
-                                    <div className="bg-border w-px h-2.5" />
-                                    <span className="text-muted-foreground/40 text-[7px] font-medium tracking-widest uppercase leading-none">by</span>
-                                    <div className="bg-border w-px h-2.5" />
-                                </div>
-                                <AppLogo compact />
+                            <Link
+                                href={dashboard()}
+                                prefetch
+                                className="flex items-center gap-0"
+                            >
+                                <BrandLockup size="sm" collapsible />
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

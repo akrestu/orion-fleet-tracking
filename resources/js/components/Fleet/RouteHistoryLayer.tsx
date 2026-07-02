@@ -1,31 +1,50 @@
 import { CircleMarker, Polyline, Tooltip } from 'react-leaflet';
+import { catmullRomSegment } from '@/lib/spline';
+import { getSpeedColor } from '@/lib/status-colors';
 import type { GpsLogPoint } from '@/types/fleet';
 
 interface Props {
     points: GpsLogPoint[];
 }
 
-function speedColor(speed: number): string {
-    if (speed < 10) return '#22c55e';   // green — slow / idle
-    if (speed < 30) return '#f59e0b';   // amber — moderate
-    return '#ef4444';                    // red — fast
-}
-
 function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(iso).toLocaleTimeString('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    });
 }
 
 export function RouteHistoryLayer({ points }: Props) {
-    if (points.length < 2) return null;
+    if (points.length < 2) {
+        return null;
+    }
 
-    // Build coloured segments between consecutive points
-    const segments = points.slice(0, -1).map((pt, i) => ({
-        positions: [
-            [pt.latitude, pt.longitude],
-            [points[i + 1].latitude, points[i + 1].longitude],
-        ] as [number, number][],
-        color: speedColor(pt.speed_kmh),
-    }));
+    // Build coloured segments between consecutive points, curved via Catmull-Rom
+    // interpolation (using neighboring points as tangent control) so the route glides
+    // through each pair instead of zig-zagging. Fewer sub-points for very large routes
+    // to protect render performance.
+    const numPoints = points.length > 1500 ? 4 : 8;
+    const segments = points.slice(0, -1).map((pt, i) => {
+        const p0: [number, number] =
+            i === 0
+                ? [pt.latitude, pt.longitude]
+                : [points[i - 1].latitude, points[i - 1].longitude];
+        const p1: [number, number] = [pt.latitude, pt.longitude];
+        const p2: [number, number] = [
+            points[i + 1].latitude,
+            points[i + 1].longitude,
+        ];
+        const p3: [number, number] =
+            i + 2 < points.length
+                ? [points[i + 2].latitude, points[i + 2].longitude]
+                : p2;
+
+        return {
+            positions: catmullRomSegment(p0, p1, p2, p3, numPoints),
+            color: getSpeedColor(pt.speed_kmh),
+        };
+    });
 
     return (
         <>
@@ -45,11 +64,16 @@ export function RouteHistoryLayer({ points }: Props) {
                         key={pt.id}
                         center={[pt.latitude, pt.longitude]}
                         radius={3}
-                        pathOptions={{ color: speedColor(pt.speed_kmh), fillOpacity: 0.9, weight: 1 }}
+                        pathOptions={{
+                            color: getSpeedColor(pt.speed_kmh),
+                            fillOpacity: 0.9,
+                            weight: 1,
+                        }}
                     >
                         <Tooltip>
                             <span className="text-xs">
-                                {formatTime(pt.recorded_at)} — {pt.speed_kmh.toFixed(1)} km/h
+                                {formatTime(pt.recorded_at)} —{' '}
+                                {pt.speed_kmh.toFixed(1)} km/h
                             </span>
                         </Tooltip>
                     </CircleMarker>

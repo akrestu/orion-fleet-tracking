@@ -37,6 +37,30 @@ class ReportController extends Controller
         ]);
     }
 
+    public function summary(): JsonResponse
+    {
+        $today = now()->startOfDay();
+
+        $activeUnits = Device::active()->count();
+        $onlineNow = Device::active()->where('last_seen_at', '>=', now()->subMinutes(10))->count();
+        $alertsToday = Alert::whereIn('alert_type', ['overspeed', 'geofence'])
+            ->whereDate('triggered_at', $today)
+            ->count();
+
+        $utilizationRows = $this->reportService->fleetUtilizationRows($today, $today, null);
+        $ratios = collect($utilizationRows)
+            ->filter(fn (array $r) => $r['operation_hours'] > 0)
+            ->map(fn (array $r) => $r['running_hours'] / $r['operation_hours'] * 100);
+        $avgUtilizationPct = $ratios->isNotEmpty() ? round((float) $ratios->avg(), 1) : null;
+
+        return response()->json([
+            'active_units' => $activeUnits,
+            'online_now' => $onlineNow,
+            'alerts_today' => $alertsToday,
+            'avg_utilization_pct' => $avgUtilizationPct,
+        ]);
+    }
+
     public function fleetUtilization(Request $request): JsonResponse
     {
         [$from, $to, $devEuiFilter] = $this->parseDateRange($request);
@@ -195,6 +219,71 @@ class ReportController extends Controller
         }, $filename, ['Content-Type' => 'text/csv']);
     }
 
+    public function rawGpsData(Request $request): JsonResponse
+    {
+        [$from, $to, $devEuiFilter] = $this->parseDateRange($request);
+
+        $request->validate(['page' => ['nullable', 'integer', 'min:1']]);
+
+        $paginator = GpsLog::with('device')
+            ->whereBetween('recorded_at', [$from, $to->copy()->endOfDay()])
+            ->when($devEuiFilter, fn ($q) => $q->where('dev_eui', $devEuiFilter))
+            ->orderBy('recorded_at', 'desc')
+            ->paginate(50, page: $request->integer('page', 1));
+
+        $rows = $paginator->getCollection()->map(fn (GpsLog $log) => [
+            'dev_eui' => $log->dev_eui,
+            'device_name' => $log->device?->device_name ?? $log->dev_eui,
+            'unit_type' => $log->device?->unit_type ?? 'other',
+            'latitude' => $log->latitude,
+            'longitude' => $log->longitude,
+            'speed_kmh' => $log->speed_kmh,
+            'heading_deg' => $log->heading_deg,
+            'rssi' => $log->rssi,
+            'snr' => $log->snr,
+            'recorded_at' => $log->recorded_at?->toIso8601String(),
+        ])->values();
+
+        return response()->json([
+            'data' => $rows,
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'total' => $paginator->total(),
+        ]);
+    }
+
+    public function geofenceAlerts(Request $request): JsonResponse
+    {
+        [$from, $to, $devEuiFilter] = $this->parseDateRange($request);
+
+        $rows = $this->reportService->geofenceAlertsData($from, $to, $devEuiFilter);
+
+        return response()->json(['data' => $rows]);
+    }
+
+    public function exportGeofenceAlerts(Request $request): BinaryFileResponse
+    {
+        [$from, $to, $devEuiFilter] = $this->parseDateRange($request, abortOnRangeExceeded: true);
+
+        $rows = $this->reportService->geofenceAlertsData($from, $to, $devEuiFilter);
+
+        $export = array_map(fn (array $r) => [
+            'Device Name' => $r['device_name'],
+            'DEV EUI' => $r['dev_eui'],
+            'Unit Type' => $r['unit_type'],
+            'Geofence' => $r['geofence_name'],
+            'Event' => ucfirst((string) $r['event']),
+            'Triggered At' => $r['triggered_at'],
+        ], $rows);
+
+        $filename = 'geofence-alerts-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
+
+        return Excel::download(
+            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Geofence', 'Event', 'Triggered At'], 'Geofence Alerts'),
+            $filename,
+        );
+    }
+
     public function cycleTime(Request $request): JsonResponse
     {
         [$from, $to, $devEuiFilter] = $this->parseDateRange($request, startOfDay: true);
@@ -221,12 +310,14 @@ class ReportController extends Controller
             'Haul Duration (min)' => $t['haul_duration_min'],
             'Return Duration (min)' => $t['return_duration_min'],
             'Cycle Duration (min)' => $t['cycle_duration_min'],
+            'Distance (km)' => $t['distance_km'],
+            'Avg Speed (km/h)' => $t['avg_speed_kmh'],
         ], $trips);
 
         $filename = 'cycle-time-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
 
         return Excel::download(
-            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Load Start', 'Load End', 'Dump Start', 'Dump End', 'Haul Duration (min)', 'Return Duration (min)', 'Cycle Duration (min)'], 'Cycle Time'),
+            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Load Start', 'Load End', 'Dump Start', 'Dump End', 'Haul Duration (min)', 'Return Duration (min)', 'Cycle Duration (min)', 'Distance (km)', 'Avg Speed (km/h)'], 'Cycle Time'),
             $filename,
         );
     }

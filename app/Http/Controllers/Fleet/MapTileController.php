@@ -64,11 +64,14 @@ class MapTileController extends Controller
         $zip->extractTo($destPath);
         $zip->close();
 
+        $zoomLevels = collect(scandir($destPath))
+            ->filter(fn ($entry) => ctype_digit($entry) && is_dir("{$destPath}/{$entry}"));
+
         $tileset = MapTileset::create([
             'name' => $request->input('name'),
             'slug' => $slug,
-            'min_zoom' => 0,
-            'max_zoom' => 19,
+            'min_zoom' => $zoomLevels->isNotEmpty() ? (int) $zoomLevels->min() : 0,
+            'max_zoom' => $zoomLevels->isNotEmpty() ? (int) $zoomLevels->max() : 19,
         ]);
 
         return response()->json([

@@ -46,12 +46,16 @@ Route::middleware(['auth', 'verified', 'role:admin'])
         Route::resource('geofences', AdminGeofenceController::class)
             ->except(['show', 'create', 'edit']);
         Route::get('reports', [AdminReportController::class, 'index'])->name('reports.index');
+        Route::get('reports/summary', [AdminReportController::class, 'summary'])->name('reports.summary');
+        Route::get('reports/raw-gps-data', [AdminReportController::class, 'rawGpsData'])->name('reports.raw-gps-data');
         Route::get('reports/fleet-utilization', [AdminReportController::class, 'fleetUtilization'])->name('reports.fleet-utilization');
         Route::get('reports/speed-violations', [AdminReportController::class, 'speedViolations'])->name('reports.speed-violations');
+        Route::get('reports/geofence-alerts', [AdminReportController::class, 'geofenceAlerts'])->name('reports.geofence-alerts');
         Route::get('reports/export/gps-logs', [AdminReportController::class, 'exportGpsLogs'])->name('reports.export.gps-logs');
         Route::get('reports/export/alerts', [AdminReportController::class, 'exportAlerts'])->name('reports.export.alerts');
         Route::get('reports/export/fleet-utilization', [AdminReportController::class, 'exportFleetUtilization'])->name('reports.export.fleet-utilization');
         Route::get('reports/export/speed-violations', [AdminReportController::class, 'exportSpeedViolations'])->name('reports.export.speed-violations');
+        Route::get('reports/export/geofence-alerts', [AdminReportController::class, 'exportGeofenceAlerts'])->name('reports.export.geofence-alerts');
         Route::get('reports/export/cycle-time', [AdminReportController::class, 'exportCycleTime'])->name('reports.export.cycle-time');
         Route::get('reports/export/delay-waiting', [AdminReportController::class, 'exportDelayWaiting'])->name('reports.export.delay-waiting');
         Route::get('reports/export/gateway-reliability', [AdminReportController::class, 'exportGatewayReliability'])->name('reports.export.gateway-reliability');

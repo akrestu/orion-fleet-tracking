@@ -12,6 +12,9 @@
         'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+    --font-mono:
+        'Fira Code', ui-monospace, 'SFMono-Regular', Menlo, Consolas,
+        'Liberation Mono', monospace;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -59,6 +62,30 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    /* Domain status tokens — single source of truth for online/offline/warning/danger
+       state across dashboard charts, map badges, and marker popups. */
+    --color-status-online: var(--status-online);
+    --color-status-offline: var(--status-offline);
+    --color-status-warning: var(--status-warning);
+    --color-status-danger: var(--status-danger);
+
+    /* Speed bands deliberately reuse the status hues so speed and alert
+       severity read as one color language (slow=online green, fast=danger red). */
+    --color-speed-slow: var(--status-online);
+    --color-speed-moderate: var(--status-warning);
+    --color-speed-fast: var(--status-danger);
+
+    /* Unit-type category colors — aliased to Tailwind's default palette so
+       config/unit-types.ts has one CSS-var source instead of raw hex literals. */
+    --color-unit-oht: var(--color-sky-500);
+    --color-unit-dt: var(--color-orange-500);
+    --color-unit-dozer: var(--color-yellow-500);
+    --color-unit-excavator: var(--color-purple-500);
+    --color-unit-grader: var(--color-emerald-500);
+    --color-unit-compactor: var(--color-rose-500);
+    --color-unit-driller: var(--color-slate-500);
+    --color-unit-other: var(--color-slate-400);
 }
 
 /* Light mode — Ash + Cerulean: pure neutrals, cerulean primary, rose accent */
@@ -96,6 +123,10 @@
     --sidebar-accent-foreground: oklch(0.2 0.005 250);
     --sidebar-border: oklch(0.85 0.003 250);
     --sidebar-ring: oklch(0.52 0.18 225);
+    --status-online: oklch(0.6 0.15 160);
+    --status-offline: oklch(0.55 0.01 250);
+    --status-warning: oklch(0.75 0.16 85);
+    --status-danger: var(--destructive);
 }
 
 /* Dark mode — true near-black with cerulean primary and rose accent */
@@ -132,6 +163,10 @@
     --sidebar-accent-foreground: oklch(0.93 0.005 250);
     --sidebar-border: oklch(0.21 0.004 250);
     --sidebar-ring: oklch(0.7 0.16 225);
+    --status-online: oklch(0.72 0.16 160);
+    --status-offline: oklch(0.53 0.01 250);
+    --status-warning: oklch(0.8 0.16 85);
+    --status-danger: var(--destructive);
 }
 
 @layer base {

@@ -68,6 +68,56 @@ it('filters fleet utilization by device', function () {
         ->and($data[0]['dev_eui'])->toBe($this->device->dev_eui);
 });
 
+// --- Summary KPIs ---
+
+it('returns summary KPIs as JSON', function () {
+    Device::factory()->create(['is_active' => true, 'last_seen_at' => now()]);
+    Alert::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'alert_type' => 'overspeed',
+        'triggered_at' => now(),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->getJson('/admin/reports/summary')
+        ->assertOk()
+        ->assertJsonStructure(['active_units', 'online_now', 'alerts_today', 'avg_utilization_pct']);
+});
+
+it('denies operator access to summary KPIs', function () {
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/summary')
+        ->assertForbidden();
+});
+
+// --- Raw GPS data ---
+
+it('returns paginated raw GPS data as JSON', function () {
+    GpsLog::factory()->count(3)->sequence(
+        fn ($seq) => ['recorded_at' => now()->subSeconds($seq->index + 1)]
+    )->create(['dev_eui' => $this->device->dev_eui]);
+
+    $response = $this->actingAs($this->admin)
+        ->getJson('/admin/reports/raw-gps-data?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertJsonStructure([
+            'data' => [
+                '*' => ['dev_eui', 'device_name', 'unit_type', 'latitude', 'longitude', 'speed_kmh', 'heading_deg', 'rssi', 'snr', 'recorded_at'],
+            ],
+            'current_page',
+            'last_page',
+            'total',
+        ]);
+
+    expect($response->json('total'))->toBe(3);
+});
+
+it('denies operator access to raw GPS data report', function () {
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/raw-gps-data')
+        ->assertForbidden();
+});
+
 // --- Speed violations ---
 
 it('returns speed violations as JSON', function () {
@@ -137,6 +187,65 @@ it('denies operator access to CSV exports', function () {
         ->assertForbidden();
 });
 
+// --- Geofence alerts ---
+
+it('returns geofence alerts as JSON', function () {
+    Alert::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'alert_type' => 'geofence',
+        'triggered_at' => now(),
+        'meta' => ['geofence_name' => 'Loading Zone A', 'event' => 'enter'],
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->getJson('/admin/reports/geofence-alerts?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertJsonStructure([
+            'data' => ['*' => ['id', 'dev_eui', 'device_name', 'geofence_name', 'event', 'triggered_at']],
+        ]);
+
+    expect($response->json('data.0.geofence_name'))->toBe('Loading Zone A')
+        ->and($response->json('data.0.event'))->toBe('enter');
+});
+
+it('excludes non-geofence alerts from geofence alerts report', function () {
+    Alert::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'alert_type' => 'overspeed',
+        'triggered_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->getJson('/admin/reports/geofence-alerts?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk();
+
+    expect($response->json('data'))->toBeEmpty();
+});
+
+it('exports geofence alerts as Excel download', function () {
+    Alert::factory()->create([
+        'dev_eui' => $this->device->dev_eui,
+        'alert_type' => 'geofence',
+        'triggered_at' => now(),
+        'meta' => ['geofence_name' => 'Loading Zone A', 'event' => 'enter'],
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/reports/export/geofence-alerts?from='.today()->toDateString().'&to='.today()->toDateString())
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+});
+
+it('denies operator access to geofence alerts report and export', function () {
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/geofence-alerts')
+        ->assertForbidden();
+
+    $this->actingAs($this->operator)
+        ->get('/admin/reports/export/geofence-alerts')
+        ->assertForbidden();
+});
+
 // --- Cycle time ---
 
 it('detects a completed loading-dumping-loading cycle', function () {
@@ -187,7 +296,9 @@ it('detects a completed loading-dumping-loading cycle', function () {
     $trips = $response->json('trips');
     expect($trips)->toHaveCount(1)
         ->and($trips[0]['cycle_duration_min'])->toBe(20)
-        ->and($trips[0]['haul_duration_min'])->toBe(10);
+        ->and($trips[0]['haul_duration_min'])->toBe(10)
+        ->and($trips[0]['distance_km'])->toBeGreaterThan(0)
+        ->and($trips[0]['avg_speed_kmh'])->toBeGreaterThan(0);
 });
 
 // --- Delay & waiting time ---

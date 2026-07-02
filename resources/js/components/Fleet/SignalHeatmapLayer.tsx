@@ -10,15 +10,34 @@ interface Props {
     timeRange: '24h' | '7d';
 }
 
+/** Canvas gradients can't resolve CSS custom properties, so read the computed
+ * value from the document at paint time instead of hardcoding hex. */
+function resolveToken(cssVarExpr: string): string {
+    const varName = cssVarExpr.match(/--[\w-]+/)?.[0];
+
+    if (!varName) {
+        return cssVarExpr;
+    }
+
+    const value = getComputedStyle(document.documentElement)
+        .getPropertyValue(varName)
+        .trim();
+
+    return value || cssVarExpr;
+}
+
 async function fetchCoverage(timeRange: '24h' | '7d'): Promise<HeatPoint[]> {
     const from =
         timeRange === '7d'
             ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
             : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const res = await fetch(`/api/fleet/signal-coverage?from=${encodeURIComponent(from)}`, {
-        credentials: 'same-origin',
-    });
+    const res = await fetch(
+        `/api/fleet/signal-coverage?from=${encodeURIComponent(from)}`,
+        {
+            credentials: 'same-origin',
+        },
+    );
 
     return res.json() as Promise<HeatPoint[]>;
 }
@@ -32,7 +51,9 @@ function HeatmapRenderer({ timeRange }: Props) {
         let cancelled = false;
 
         fetchCoverage(timeRange).then((points) => {
-            if (cancelled) return;
+            if (cancelled) {
+                return;
+            }
 
             setPointCount(points.length);
 
@@ -45,10 +66,10 @@ function HeatmapRenderer({ timeRange }: Props) {
                     maxZoom: 18,
                     max: 1.0,
                     gradient: {
-                        0.0: '#ef4444', // red — poor signal
-                        0.4: '#f59e0b', // amber
-                        0.7: '#22c55e', // green — good signal
-                        1.0: '#3b82f6', // blue — excellent
+                        0.0: resolveToken('var(--color-status-danger)'), // poor signal
+                        0.4: resolveToken('var(--color-status-warning)'), // moderate
+                        0.7: resolveToken('var(--color-status-online)'), // good signal
+                        1.0: resolveToken('var(--color-primary)'), // excellent
                     },
                 }).addTo(map);
             }
@@ -70,14 +91,22 @@ function HeatmapRenderer({ timeRange }: Props) {
     }, [map]);
 
     return pointCount > 0 ? (
-        <div className="bg-card/90 border-border absolute bottom-20 right-4 z-[999] rounded-lg border px-3 py-2 shadow-sm">
-            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Signal Coverage</p>
-            <p className="text-foreground mt-0.5 text-xs">{pointCount.toLocaleString()} titik RSSI</p>
+        <div className="absolute right-4 bottom-20 z-[999] rounded-lg border border-border bg-card/90 px-3 py-2 shadow-sm">
+            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                Signal Coverage
+            </p>
+            <p className="mt-0.5 text-xs text-foreground">
+                {pointCount.toLocaleString()} titik RSSI
+            </p>
             <div className="mt-1.5 flex items-center gap-1 text-xs">
-                <span className="inline-block h-2 w-4 rounded-sm bg-red-500" /> Lemah
-                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-amber-500" /> Sedang
-                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-green-500" /> Baik
-                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-blue-500" /> Sangat Baik
+                <span className="inline-block h-2 w-4 rounded-sm bg-status-danger" />{' '}
+                Lemah
+                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-status-warning" />{' '}
+                Sedang
+                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-status-online" />{' '}
+                Baik
+                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-primary" />{' '}
+                Sangat Baik
             </div>
         </div>
     ) : null;

@@ -102,6 +102,32 @@ class ReportService
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function geofenceAlertsData(CarbonInterface $from, CarbonInterface $to, ?string $devEuiFilter): array
+    {
+        $query = Alert::with('device')
+            ->where('alert_type', 'geofence')
+            ->whereBetween('triggered_at', [$from, $to->copy()->endOfDay()])
+            ->orderBy('triggered_at', 'desc');
+
+        if ($devEuiFilter) {
+            $query->where('dev_eui', $devEuiFilter);
+        }
+
+        return $query->get()->map(fn ($alert) => [
+            'id' => $alert->id,
+            'dev_eui' => $alert->dev_eui,
+            'device_name' => $alert->device?->device_name ?? $alert->dev_eui,
+            'unit_type' => $alert->device?->unit_type ?? 'other',
+            'geofence_name' => $alert->meta['geofence_name'] ?? null,
+            'event' => $alert->meta['event'] ?? null,
+            'triggered_at' => $alert->triggered_at?->toIso8601String(),
+            'triggered_at_human' => $alert->triggered_at?->diffForHumans(),
+        ])->values()->all();
+    }
+
+    /**
      * @return array{trips: array<int, array<string, mixed>>, summary: array<int, array<string, mixed>>, warning: ?string}
      */
     public function cycleTimeData(CarbonInterface $from, CarbonInterface $to, ?string $devEuiFilter): array
@@ -143,8 +169,24 @@ class ReportService
                             break;
                         }
                     }
-                    $timeline[] = ['zone' => $zoneType, 'at' => $log->recorded_at, 'speed' => (float) $log->speed_kmh];
+                    $timeline[] = ['zone' => $zoneType, 'at' => $log->recorded_at, 'speed' => (float) $log->speed_kmh, 'lat' => $lat, 'lng' => $lng];
                 });
+
+            $tripDistanceKm = function (CarbonInterface $start, CarbonInterface $end) use ($timeline): float {
+                $distance = 0.0;
+                $prevPoint = null;
+                foreach ($timeline as $point) {
+                    if ($point['at']->lt($start) || $point['at']->gt($end)) {
+                        continue;
+                    }
+                    if ($prevPoint !== null) {
+                        $distance += GeoHelper::haversineKm($prevPoint['lat'], $prevPoint['lng'], $point['lat'], $point['lng']);
+                    }
+                    $prevPoint = $point;
+                }
+
+                return round($distance, 2);
+            };
 
             // Compress consecutive same-zone segments
             $segments = [];
@@ -171,6 +213,10 @@ class ReportService
                         abs($seg['start']->diffInSeconds(Carbon::parse($currentTrip['load_start']))) / 60,
                         1,
                     );
+                    $currentTrip['distance_km'] = $tripDistanceKm(Carbon::parse($currentTrip['load_start']), $seg['start']);
+                    $currentTrip['avg_speed_kmh'] = $currentTrip['cycle_duration_min'] > 0
+                        ? round($currentTrip['distance_km'] / ($currentTrip['cycle_duration_min'] / 60), 1)
+                        : null;
                     $trips[] = $currentTrip;
                     // Start fresh trip at this loading zone
                     $currentTrip = [
@@ -185,6 +231,8 @@ class ReportService
                         'cycle_duration_min' => null,
                         'haul_duration_min' => null,
                         'return_duration_min' => null,
+                        'distance_km' => null,
+                        'avg_speed_kmh' => null,
                     ];
                 } elseif ($seg['zone'] === 'loading') {
                     // Start a new trip
@@ -200,6 +248,8 @@ class ReportService
                         'cycle_duration_min' => null,
                         'haul_duration_min' => null,
                         'return_duration_min' => null,
+                        'distance_km' => null,
+                        'avg_speed_kmh' => null,
                     ];
                 } elseif ($seg['zone'] === 'dumping' && $currentTrip !== null && $currentTrip['dump_start'] === null) {
                     $currentTrip['dump_start'] = $seg['start']->toIso8601String();
