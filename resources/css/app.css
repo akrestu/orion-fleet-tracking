@@ -64,28 +64,35 @@
     --color-sidebar-ring: var(--sidebar-ring);
 
     /* Domain status tokens — single source of truth for online/offline/warning/danger
-       state across dashboard charts, map badges, and marker popups. */
+       state across dashboard charts, map badges, and marker popups. Each status also
+       has a tinted -bg pair for badge/alert fills (StatusBadge, alert cards). */
     --color-status-online: var(--status-online);
+    --color-status-online-bg: var(--status-online-bg);
     --color-status-offline: var(--status-offline);
+    --color-status-offline-bg: var(--status-offline-bg);
     --color-status-warning: var(--status-warning);
+    --color-status-warning-bg: var(--status-warning-bg);
     --color-status-danger: var(--status-danger);
+    --color-status-danger-bg: var(--status-danger-bg);
 
-    /* Speed bands deliberately reuse the status hues so speed and alert
-       severity read as one color language (slow=online green, fast=danger red). */
-    --color-speed-slow: var(--status-online);
-    --color-speed-moderate: var(--status-warning);
-    --color-speed-fast: var(--status-danger);
+    /* Speed bands are a brand-intensity ramp, deliberately NOT aliased to the
+       status hues — a fast-moving unit must never read as a fault. */
+    --color-speed-slow: var(--speed-slow);
+    --color-speed-moderate: var(--speed-moderate);
+    --color-speed-fast: var(--speed-fast);
 
-    /* Unit-type category colors — aliased to Tailwind's default palette so
-       config/unit-types.ts has one CSS-var source instead of raw hex literals. */
-    --color-unit-oht: var(--color-sky-500);
-    --color-unit-dt: var(--color-orange-500);
-    --color-unit-dozer: var(--color-yellow-500);
-    --color-unit-excavator: var(--color-purple-500);
-    --color-unit-grader: var(--color-emerald-500);
-    --color-unit-compactor: var(--color-rose-500);
-    --color-unit-driller: var(--color-slate-500);
-    --color-unit-other: var(--color-slate-400);
+    /* Unit-type category colors — distinct OKLCH hues chosen away from
+       green/amber/red so a unit's identity never collides with its status
+       on the map. Equipment icons repeat the class as a shape too, so
+       identity still reads colorblind-safe. */
+    --color-unit-oht: var(--unit-oht);
+    --color-unit-dt: var(--unit-dt);
+    --color-unit-dozer: var(--unit-dozer);
+    --color-unit-excavator: var(--unit-excavator);
+    --color-unit-grader: var(--unit-grader);
+    --color-unit-compactor: var(--unit-compactor);
+    --color-unit-driller: var(--unit-driller);
+    --color-unit-other: var(--unit-other);
 }
 
 /* Light mode — Ash + Cerulean: pure neutrals, cerulean primary, rose accent */
@@ -124,9 +131,29 @@
     --sidebar-border: oklch(0.85 0.003 250);
     --sidebar-ring: oklch(0.52 0.18 225);
     --status-online: oklch(0.6 0.15 160);
+    --status-online-bg: oklch(0.955 0.040 160);
     --status-offline: oklch(0.55 0.01 250);
+    --status-offline-bg: oklch(0.965 0.003 250);
     --status-warning: oklch(0.75 0.16 85);
+    --status-warning-bg: oklch(0.962 0.050 85);
     --status-danger: var(--destructive);
+    --status-danger-bg: oklch(0.958 0.035 27);
+
+    /* Speed — brand-intensity ramp (same hue as --primary, 225), separate
+       channel from status so speed and safety never fight for the same color. */
+    --speed-slow: oklch(0.82 0.075 225);
+    --speed-moderate: oklch(0.52 0.18 225);
+    --speed-fast: oklch(0.36 0.15 225);
+
+    /* Unit type — categorical marker fills for the 7 equipment classes. */
+    --unit-oht: oklch(0.560 0.140 255);
+    --unit-dt: oklch(0.585 0.150 300);
+    --unit-excavator: oklch(0.640 0.120 190);
+    --unit-dozer: oklch(0.680 0.130 55);
+    --unit-grader: oklch(0.600 0.140 330);
+    --unit-compactor: oklch(0.540 0.130 275);
+    --unit-driller: oklch(0.580 0.130 210);
+    --unit-other: oklch(0.55 0.01 250);
 }
 
 /* Dark mode — true near-black with cerulean primary and rose accent */
@@ -164,9 +191,26 @@
     --sidebar-border: oklch(0.21 0.004 250);
     --sidebar-ring: oklch(0.7 0.16 225);
     --status-online: oklch(0.72 0.16 160);
+    --status-online-bg: oklch(0.310 0.060 160);
     --status-offline: oklch(0.53 0.01 250);
+    --status-offline-bg: oklch(0.21 0.004 250);
     --status-warning: oklch(0.8 0.16 85);
+    --status-warning-bg: oklch(0.330 0.060 85);
     --status-danger: var(--destructive);
+    --status-danger-bg: oklch(0.320 0.080 25);
+
+    --speed-slow: oklch(0.40 0.11 225);
+    --speed-moderate: oklch(0.7 0.16 225);
+    --speed-fast: oklch(0.85 0.13 225);
+
+    --unit-oht: oklch(0.640 0.140 255);
+    --unit-dt: oklch(0.660 0.150 300);
+    --unit-excavator: oklch(0.710 0.120 190);
+    --unit-dozer: oklch(0.740 0.130 60);
+    --unit-grader: oklch(0.670 0.140 330);
+    --unit-compactor: oklch(0.620 0.140 275);
+    --unit-driller: oklch(0.660 0.130 210);
+    --unit-other: oklch(0.6 0.01 250);
 }
 
 @layer base {

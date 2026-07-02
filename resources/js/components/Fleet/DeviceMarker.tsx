@@ -1,11 +1,11 @@
 import type L from 'leaflet';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
+import { StatusBadge } from '@/components/ui/badge';
 import { UNIT_CATEGORIES } from '@/config/unit-types';
 import { useAnimatedMarkerPosition } from '@/hooks/use-animated-marker';
 import { useTick } from '@/hooks/use-tick';
 import { createDeviceIcon } from '@/lib/device-icon';
-import { getStatusColor } from '@/lib/status-colors';
 import { formatRelativeTime, isStale } from '@/lib/time';
 import type { DevicePosition } from '@/types/fleet';
 
@@ -70,21 +70,10 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
                 <div className="min-w-[160px] text-sm">
                     <div className="flex items-center justify-between gap-2">
                         <p className="font-semibold">{device.device_name}</p>
-                        <span
-                            className="inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold"
-                            style={{
-                                backgroundColor: `color-mix(in oklch, ${getStatusColor(isOnline)} 15%, transparent)`,
-                                color: getStatusColor(isOnline),
-                            }}
-                        >
-                            <span
-                                className="h-1.5 w-1.5 rounded-full"
-                                style={{
-                                    backgroundColor: getStatusColor(isOnline),
-                                }}
-                            />
-                            {isOnline ? 'Online' : 'Offline'}
-                        </span>
+                        <StatusBadge
+                            status={isOnline ? 'online' : 'offline'}
+                            className="shrink-0 text-[10px]"
+                        />
                     </div>
                     {device.unit_model && (
                         <p className="text-xs text-muted-foreground">

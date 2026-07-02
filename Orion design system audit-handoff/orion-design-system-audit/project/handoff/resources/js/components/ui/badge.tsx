@@ -1,12 +1,18 @@
-import { Slot } from "@radix-ui/react-slot"
-import { cva, type VariantProps } from "class-variance-authority"
-import * as React from "react"
+// resources/js/components/ui/badge.tsx
+// shadcn/ui Badge + Orion device-state variants.
+// If you already have this file, just merge the four lines marked
+// "// Orion" into your existing badgeVariants, and copy the StatusBadge
+// helper at the bottom. Everything else matches the stock shadcn Badge.
 
-import { cn } from "@/lib/utils"
-import { STATUS_LABEL, type DeviceStatus } from "@/lib/status-colors"
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+import { STATUS_LABEL, type DeviceStatus } from "@/lib/fleet";
 
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  "inline-flex items-center justify-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 [&>svg]:pointer-events-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
   {
     variants: {
       variant: {
@@ -15,23 +21,20 @@ const badgeVariants = cva(
         secondary:
           "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
         destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
-        outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+          "border-transparent bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90",
+        outline: "text-foreground border-border [a&]:hover:bg-muted",
         // Orion — device-state variants (tinted bg + status foreground)
         online: "border-transparent bg-status-online-bg text-status-online",
-        offline:
-          "border-transparent bg-status-offline-bg text-status-offline",
-        warning:
-          "border-transparent bg-status-warning-bg text-status-warning",
+        offline: "border-transparent bg-status-offline-bg text-status-offline",
+        warning: "border-transparent bg-status-warning-bg text-status-warning",
         danger: "border-transparent bg-status-danger-bg text-status-danger",
       },
     },
     defaultVariants: {
       variant: "default",
     },
-  }
-)
+  },
+);
 
 function Badge({
   className,
@@ -40,21 +43,19 @@ function Badge({
   ...props
 }: React.ComponentProps<"span"> &
   VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "span"
-
+  const Comp = asChild ? Slot : "span";
   return (
     <Comp
       data-slot="badge"
       className={cn(badgeVariants({ variant }), className)}
       {...props}
     />
-  )
+  );
 }
 
 // -----------------------------------------------------------------------------
 // StatusBadge — Orion convenience wrapper. Renders the leading status dot and
-// the canonical label so device status looks identical everywhere it appears
-// (map popups, sidebar list, tables).
+// the canonical label so device status looks identical everywhere it appears.
 //   <StatusBadge status="warning" />            -> • Warning
 //   <StatusBadge status="online">Live</StatusBadge>
 // -----------------------------------------------------------------------------
@@ -71,7 +72,7 @@ function StatusBadge({
       <span className="size-1.5 rounded-full bg-current" aria-hidden="true" />
       {children ?? STATUS_LABEL[status]}
     </Badge>
-  )
+  );
 }
 
-export { Badge, StatusBadge, badgeVariants }
+export { Badge, StatusBadge, badgeVariants };

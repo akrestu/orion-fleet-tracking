@@ -1,4 +1,4 @@
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { UNIT_CATEGORIES } from '@/config/unit-types';
 import { useTick } from '@/hooks/use-tick';
@@ -26,21 +26,16 @@ export function DeviceSidebarItem({
         <>
             <button
                 onClick={onClick}
-                className={`w-full px-4 py-3 text-left transition-colors hover:bg-muted/50 ${isSelected ? 'border-l-2 border-sky-500 bg-sky-500/10' : 'border-l-2 border-transparent'}`}
+                className={`w-full px-4 py-3 text-left transition-colors hover:bg-muted/50 ${isSelected ? 'border-l-2 border-primary bg-primary/10' : 'border-l-2 border-transparent'}`}
             >
                 <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-medium text-foreground">
                         {device.device_name}
                     </span>
-                    <Badge
-                        variant="outline"
-                        className={`shrink-0 text-xs ${isOnline ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400' : 'border-muted-foreground/30 text-muted-foreground'}`}
-                    >
-                        <span
-                            className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-muted-foreground'}`}
-                        />
-                        {isOnline ? 'Online' : 'Offline'}
-                    </Badge>
+                    <StatusBadge
+                        status={isOnline ? 'online' : 'offline'}
+                        className="shrink-0"
+                    />
                 </div>
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -75,7 +70,7 @@ export function DeviceSidebarItem({
                 {lastUpdate && (
                     <div className="mt-1 flex items-center gap-1">
                         <span
-                            className={`text-xs ${stale ? 'font-medium text-amber-600 dark:text-amber-500' : 'text-muted-foreground'}`}
+                            className={`text-xs ${stale ? 'font-medium text-status-warning' : 'text-muted-foreground'}`}
                         >
                             {stale && '⚠ '}
                             Update terakhir: {lastUpdate}

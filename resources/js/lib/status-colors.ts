@@ -9,6 +9,23 @@
 export type SpeedBand = 'slow' | 'moderate' | 'fast';
 export type SignalQuality = 'good' | 'fair' | 'poor';
 
+/**
+ * Device status — the canonical 4 states, identical everywhere they appear
+ * (StatusBadge, map markers, table rows, alert cards):
+ *   online  = telemetry reporting < 60s
+ *   offline = no signal
+ *   warning = threshold breach (speed/geofence/alert-thresholds)
+ *   danger  = critical fault
+ */
+export type DeviceStatus = 'online' | 'offline' | 'warning' | 'danger';
+
+export const STATUS_LABEL: Record<DeviceStatus, string> = {
+    online: 'Online',
+    offline: 'Offline',
+    warning: 'Warning',
+    danger: 'Danger',
+};
+
 export const STATUS_ONLINE = 'var(--color-status-online)';
 export const STATUS_OFFLINE = 'var(--color-status-offline)';
 export const STATUS_WARNING = 'var(--color-status-warning)';
