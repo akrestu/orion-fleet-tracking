@@ -9,7 +9,7 @@ import {
 import { Copy, KeyRound, Plus, Server, Shield, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -79,12 +79,12 @@ type PageProps = {
     flash?: { new_token?: string; success?: string };
 };
 
-const EVENT_BADGE: Record<string, string> = {
-    login: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20',
-    logout: 'bg-slate-500/15 text-slate-500 border-slate-500/20',
-    settings_updated: 'bg-blue-500/15 text-blue-600 border-blue-500/20',
-    api_token_created: 'bg-amber-500/15 text-amber-600 border-amber-500/20',
-    api_token_deleted: 'bg-red-500/15 text-red-600 border-red-500/20',
+const EVENT_VARIANT: Record<string, BadgeVariant> = {
+    login: 'online',
+    logout: 'offline',
+    settings_updated: 'outline',
+    api_token_created: 'warning',
+    api_token_deleted: 'danger',
 };
 
 // ── MQTT Panel ────────────────────────────────────────────────────────────────
@@ -203,8 +203,8 @@ function NewTokenBanner({ token, onDismiss }: { token: string; onDismiss: () => 
     };
 
     return (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
-            <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+        <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 space-y-2">
+            <p className="text-sm font-medium text-status-warning">
                 Copy your new API token now — it won't be shown again.
             </p>
             <div className="flex items-center gap-2">
@@ -458,7 +458,7 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
             accessorKey: 'event',
             header: 'Event',
             cell: ({ row }) => (
-                <Badge variant="outline" className={EVENT_BADGE[row.original.event] ?? ''}>
+                <Badge variant={EVENT_VARIANT[row.original.event] ?? 'outline'}>
                     {row.original.event.replace(/_/g, ' ')}
                 </Badge>
             ),

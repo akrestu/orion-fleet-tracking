@@ -7,7 +7,7 @@ import { LayersControl, MapContainer, Polygon, TileLayer, useMap, useMapEvents }
 import GeofenceController from '@/actions/App/Http/Controllers/Admin/GeofenceController';
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -61,11 +61,14 @@ const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
     parking: 'Parking Zone',
 };
 
-const ZONE_TYPE_BADGE: Record<ZoneType, string> = {
-    none: 'bg-slate-500/15 text-slate-400 border-slate-500/20',
-    loading: 'bg-amber-500/15 text-amber-500 border-amber-500/20',
-    dumping: 'bg-red-500/15 text-red-400 border-red-500/20',
-    parking: 'bg-sky-500/15 text-sky-400 border-sky-500/20',
+// Loading/dumping zones carry real operational risk (equipment converging,
+// tipping hazards), so they borrow the same warning/danger tokens used for
+// device status elsewhere — same colors, same meaning, everywhere in Orion.
+const ZONE_TYPE_VARIANT: Record<ZoneType, BadgeVariant> = {
+    none: 'secondary',
+    loading: 'warning',
+    dumping: 'danger',
+    parking: 'secondary',
 };
 
 // ---- Calls invalidateSize after map mounts inside a dialog ----
@@ -603,10 +606,7 @@ export default function GeofencesIndex({ geofences, tilesets }: PageProps) {
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                variant="outline"
-                                                className={ZONE_TYPE_BADGE[g.zone_type] ?? ZONE_TYPE_BADGE.none}
-                                            >
+                                            <Badge variant={ZONE_TYPE_VARIANT[g.zone_type] ?? 'secondary'}>
                                                 {ZONE_TYPE_LABELS[g.zone_type] ?? 'General'}
                                             </Badge>
                                         </TableCell>
@@ -622,13 +622,9 @@ export default function GeofencesIndex({ geofences, tilesets }: PageProps) {
                                         <TableCell>{g.vertex_count}</TableCell>
                                         <TableCell>
                                             {g.is_active ? (
-                                                <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/15 text-emerald-600">
-                                                    Active
-                                                </Badge>
+                                                <Badge variant="online">Active</Badge>
                                             ) : (
-                                                <Badge variant="outline" className="border-slate-500/20 bg-slate-500/15 text-slate-500">
-                                                    Inactive
-                                                </Badge>
+                                                <Badge variant="offline">Inactive</Badge>
                                             )}
                                         </TableCell>
                                         <TableCell>

@@ -3,7 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import { Head, usePage } from '@inertiajs/react';
 import L from 'leaflet';
 import { Menu } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     LayersControl,
     MapContainer,
@@ -16,6 +16,7 @@ import { ConnectionBadge } from '@/components/Fleet/ConnectionBadge';
 import { DeviceMarker } from '@/components/Fleet/DeviceMarker';
 import { DeviceSidebarItem } from '@/components/Fleet/DeviceSidebarItem';
 import { GeofenceLayer } from '@/components/Fleet/GeofenceLayer';
+import { MapMarker } from '@/components/Fleet/MapMarker';
 import { MapTileUpload } from '@/components/Fleet/MapTileUpload';
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import { RouteHistoryLayer } from '@/components/Fleet/RouteHistoryLayer';
@@ -105,6 +106,10 @@ export default function FleetMap({
     const isMobile = useIsMobile();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedDevEui, setSelectedDevEui] = useState<string | null>(null);
+    const selectedDevice = useMemo(
+        () => positionList.find((d) => d.dev_eui === selectedDevEui),
+        [positionList, selectedDevEui],
+    );
     const [statusFilter, setStatusFilter] = useState<
         'all' | 'online' | 'offline'
     >('all');
@@ -273,6 +278,16 @@ export default function FleetMap({
             {/* Route history time range — only show when a device is selected */}
             {selectedDevEui && (
                 <div className="border-b border-border px-4 py-2">
+                    {selectedDevice && (
+                        <MapMarker
+                            unitType={selectedDevice.unit_type}
+                            status={selectedDevice.status}
+                            label={selectedDevice.device_name}
+                            selected
+                            className="mb-2 cursor-default"
+                            tabIndex={-1}
+                        />
+                    )}
                     <p className="mb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                         Riwayat Rute{' '}
                         {routeLoading && (

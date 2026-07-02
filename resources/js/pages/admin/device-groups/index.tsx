@@ -448,12 +448,12 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
                             <div className="flex items-start justify-between">
                                 <div>
                                     <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Grouped Devices</p>
-                                    <p className="mt-1 text-3xl font-bold text-emerald-400">
+                                    <p className="mt-1 text-3xl font-bold text-status-online">
                                         {groups.reduce((sum, g) => sum + g.devices_count, 0)}
                                     </p>
                                 </div>
-                                <div className="rounded-lg bg-emerald-500/10 p-2">
-                                    <FolderOpen className="h-5 w-5 text-emerald-400" />
+                                <div className="rounded-lg bg-status-online-bg p-2">
+                                    <FolderOpen className="h-5 w-5 text-status-online" />
                                 </div>
                             </div>
                         </CardContent>
@@ -463,10 +463,10 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
                             <div className="flex items-start justify-between">
                                 <div>
                                     <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Ungrouped Devices</p>
-                                    <p className="mt-1 text-3xl font-bold text-amber-400">{ungroupedCount}</p>
+                                    <p className="mt-1 text-3xl font-bold text-status-warning">{ungroupedCount}</p>
                                 </div>
-                                <div className="rounded-lg bg-amber-500/10 p-2">
-                                    <FolderOpen className="h-5 w-5 text-amber-400" />
+                                <div className="rounded-lg bg-status-warning-bg p-2">
+                                    <FolderOpen className="h-5 w-5 text-status-warning" />
                                 </div>
                             </div>
                         </CardContent>

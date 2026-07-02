@@ -12,7 +12,7 @@ import {
 import { ArrowUpDown, CheckCircle, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import AlertController from '@/actions/App/Http/Controllers/Admin/AlertController';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -65,11 +65,15 @@ type PageProps = {
     devices: DeviceOption[];
 };
 
-const ALERT_TYPE_BADGE: Record<AlertType, string> = {
-    overspeed: 'bg-red-500/15 text-red-600 border-red-500/20',
-    geofence: 'bg-orange-500/15 text-orange-600 border-orange-500/20',
-    offline: 'bg-slate-500/15 text-slate-500 border-slate-500/20',
-    low_signal: 'bg-yellow-500/15 text-yellow-600 border-yellow-500/20',
+// Alert type carries severity via the same 4-state Orion status vocabulary
+// used for device status everywhere else — overspeed/geofence are threshold
+// breaches (warning), offline matches the status literally, and low signal
+// is a degraded (not yet failed) connection, also a warning.
+const ALERT_TYPE_VARIANT: Record<AlertType, BadgeVariant> = {
+    overspeed: 'warning',
+    geofence: 'warning',
+    offline: 'offline',
+    low_signal: 'warning',
 };
 
 const ALERT_TYPE_LABEL: Record<AlertType, string> = {
@@ -88,7 +92,7 @@ function ResolveAlertButton({ alert }: { alert: AdminAlert }) {
         <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-emerald-600 hover:text-emerald-700"
+            className="h-8 w-8 text-status-online hover:text-status-online"
             onClick={() => patch(AlertController.resolve.url(alert.id), { preserveScroll: true })}
             disabled={processing}
             title="Resolve alert"
@@ -181,7 +185,7 @@ export default function AlertsIndex({ alerts, devices }: PageProps) {
             accessorKey: 'alert_type',
             header: 'Type',
             cell: ({ row }) => (
-                <Badge variant="outline" className={ALERT_TYPE_BADGE[row.original.alert_type]}>
+                <Badge variant={ALERT_TYPE_VARIANT[row.original.alert_type]}>
                     {ALERT_TYPE_LABEL[row.original.alert_type]}
                 </Badge>
             ),
@@ -229,17 +233,13 @@ export default function AlertsIndex({ alerts, devices }: PageProps) {
             cell: ({ row }) =>
                 row.original.is_resolved ? (
                     <div>
-                        <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/20">
-                            Resolved
-                        </Badge>
+                        <Badge variant="online">Resolved</Badge>
                         {row.original.resolved_at && (
                             <div className="mt-0.5 text-xs text-muted-foreground">{row.original.resolved_at}</div>
                         )}
                     </div>
                 ) : (
-                    <Badge variant="outline" className="bg-red-500/15 text-red-600 border-red-500/20">
-                        Active
-                    </Badge>
+                    <Badge variant="danger">Active</Badge>
                 ),
         },
         {
@@ -280,7 +280,7 @@ export default function AlertsIndex({ alerts, devices }: PageProps) {
                         <p className="text-sm text-muted-foreground">
                             {activeCount > 0 ? (
                                 <>
-                                    <span className="font-medium text-red-600">{activeCount} active</span> alert
+                                    <span className="font-medium text-status-danger">{activeCount} active</span> alert
                                     {activeCount !== 1 ? 's' : ''} requiring attention.
                                 </>
                             ) : (

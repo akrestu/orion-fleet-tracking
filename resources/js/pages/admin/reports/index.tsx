@@ -76,6 +76,7 @@ type DeviceOption = {
 
 type PageProps = {
     devices: DeviceOption[];
+    tilesets: Tileset[];
 };
 
 type UtilizationRow = {
@@ -741,7 +742,13 @@ function PlaybackMarker({
     );
 }
 
-function TrackingMonitoringTab({ devices }: { devices: DeviceOption[] }) {
+function TrackingMonitoringTab({
+    devices,
+    tilesets,
+}: {
+    devices: DeviceOption[];
+    tilesets: Tileset[];
+}) {
     const [devEui, setDevEui] = useUrlFilter(
         'dev_eui',
         devices[0]?.dev_eui ?? '',
@@ -754,26 +761,11 @@ function TrackingMonitoringTab({ devices }: { devices: DeviceOption[] }) {
     const [playing, setPlaying] = useState(false);
     const [playbackSpeed, setPlaybackSpeed] =
         useState<(typeof PLAYBACK_SPEEDS)[number]>(1);
-    const [tilesets, setTilesets] = useState<Tileset[]>([]);
     const [activeBaseLayer] = useState<string>(
         () =>
             localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER,
     );
     const abortRef = useRef<AbortController | null>(null);
-
-    useEffect(() => {
-        fetch(fleet.map.tiles.index.url(), {
-            headers: {
-                Accept: 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
-        })
-            .then((r) => r.json())
-            .then((data: Tileset[]) => setTilesets(data ?? []))
-            .catch(() => {
-                // best-effort — fall back to built-in base layers
-            });
-    }, []);
 
     const fetchHistory = useCallback(
         async (dEui: string, from: string, to: string) => {
@@ -1155,7 +1147,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                 </Button>
             ),
             cell: ({ row }) => (
-                <span className="text-emerald-600 tabular-nums dark:text-emerald-400">
+                <span className="text-status-online tabular-nums">
                     {row.original.running_hours} h
                 </span>
             ),
@@ -1184,7 +1176,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                         : 0;
 
                 return (
-                    <span className="text-amber-600 tabular-nums dark:text-amber-400">
+                    <span className="text-status-warning tabular-nums">
                         {row.original.idle_hours} h
                         {pct > 0 && (
                             <span className="ml-1 text-xs opacity-70">
@@ -1305,7 +1297,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription>Running Hours</CardDescription>
-                            <CardTitle className="text-2xl text-emerald-600 tabular-nums dark:text-emerald-400">
+                            <CardTitle className="text-2xl text-status-online tabular-nums">
                                 {totalRunning.toFixed(1)} h
                             </CardTitle>
                         </CardHeader>
@@ -1313,7 +1305,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription>Idle Hours</CardDescription>
-                            <CardTitle className="text-2xl text-amber-600 tabular-nums dark:text-amber-400">
+                            <CardTitle className="text-2xl text-status-warning tabular-nums">
                                 {totalIdle.toFixed(1)} h
                                 {totalHours > 0 && (
                                     <span className="ml-1 text-sm font-normal opacity-70">
@@ -1562,7 +1554,7 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
             ),
             cell: ({ row }) =>
                 row.original.speed_kmh !== null ? (
-                    <span className="font-medium text-red-600 tabular-nums">
+                    <span className="font-medium text-status-danger tabular-nums">
                         {row.original.speed_kmh} km/h
                     </span>
                 ) : (
@@ -1608,19 +1600,9 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
             header: 'Status',
             cell: ({ row }) =>
                 row.original.is_resolved ? (
-                    <Badge
-                        variant="outline"
-                        className="border-emerald-500/20 bg-emerald-500/15 text-emerald-600"
-                    >
-                        Resolved
-                    </Badge>
+                    <Badge variant="online">Resolved</Badge>
                 ) : (
-                    <Badge
-                        variant="outline"
-                        className="border-red-500/20 bg-red-500/15 text-red-600"
-                    >
-                        Active
-                    </Badge>
+                    <Badge variant="danger">Active</Badge>
                 ),
         },
     ];
@@ -1684,14 +1666,11 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                variant="outline"
-                                                className="border-red-500/20 bg-red-500/15 text-red-600 tabular-nums"
-                                            >
+                                            <Badge variant="danger" className="tabular-nums">
                                                 {s.violation_count}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-red-600 tabular-nums">
+                                        <TableCell className="text-status-danger tabular-nums">
                                             {s.max_speed_kmh !== null
                                                 ? `${s.max_speed_kmh} km/h`
                                                 : '—'}
@@ -1906,19 +1885,9 @@ function GeofenceAlertsTable({ devices }: { devices: DeviceOption[] }) {
             header: 'Event',
             cell: ({ row }) =>
                 row.original.event === 'enter' ? (
-                    <Badge
-                        variant="outline"
-                        className="border-sky-500/20 bg-sky-500/15 text-sky-600"
-                    >
-                        Enter
-                    </Badge>
+                    <Badge variant="secondary">Enter</Badge>
                 ) : (
-                    <Badge
-                        variant="outline"
-                        className="border-orange-500/20 bg-orange-500/15 text-orange-600"
-                    >
-                        Exit
-                    </Badge>
+                    <Badge variant="outline">Exit</Badge>
                 ),
         },
         {
@@ -2160,7 +2129,7 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
             header: 'Load Start',
             cell: ({ row }) => (
                 <div className="text-sm tabular-nums">
-                    <div className="font-medium text-amber-600 dark:text-amber-400">
+                    <div className="font-medium text-foreground">
                         {formatTime(row.original.load_start)}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -2173,7 +2142,7 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
             accessorKey: 'dump_start',
             header: 'Dump Start',
             cell: ({ row }) => (
-                <div className="text-sm font-medium text-red-600 tabular-nums dark:text-red-400">
+                <div className="text-sm font-medium text-foreground tabular-nums">
                     {formatTime(row.original.dump_start)}
                 </div>
             ),
@@ -2286,7 +2255,7 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
             />
 
             {warning && (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+                <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-sm text-status-warning">
                     {warning}
                 </div>
             )}
@@ -2320,7 +2289,7 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-xl font-semibold text-amber-600 tabular-nums dark:text-amber-400">
+                                        <p className="text-xl font-semibold tabular-nums">
                                             {formatMin(s.avg_haul_min)}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
@@ -2530,17 +2499,11 @@ function DelayWaitingTab({ devices }: { devices: DeviceOption[] }) {
             header: 'Type',
             cell: ({ row }) =>
                 row.original.type === 'waiting' ? (
-                    <Badge
-                        variant="outline"
-                        className="border-amber-500/20 bg-amber-500/15 text-amber-600 capitalize"
-                    >
+                    <Badge variant="warning" className="capitalize">
                         Waiting
                     </Badge>
                 ) : (
-                    <Badge
-                        variant="outline"
-                        className="border-red-500/20 bg-red-500/15 text-red-600 capitalize"
-                    >
+                    <Badge variant="danger" className="capitalize">
                         Delay
                     </Badge>
                 ),
@@ -2659,13 +2622,13 @@ function DelayWaitingTab({ devices }: { devices: DeviceOption[] }) {
                                         <TableCell className="tabular-nums">
                                             {s.waiting_count}
                                         </TableCell>
-                                        <TableCell className="text-amber-600 tabular-nums dark:text-amber-400">
+                                        <TableCell className="text-status-warning tabular-nums">
                                             {formatMin(s.waiting_min)}
                                         </TableCell>
                                         <TableCell className="tabular-nums">
                                             {s.delay_count}
                                         </TableCell>
-                                        <TableCell className="text-red-600 tabular-nums dark:text-red-400">
+                                        <TableCell className="text-status-danger tabular-nums">
                                             {formatMin(s.delay_min)}
                                         </TableCell>
                                     </TableRow>
@@ -3261,7 +3224,7 @@ function ExportTab({ devices }: { devices: DeviceOption[] }) {
     );
 }
 
-export default function ReportsIndex({ devices }: PageProps) {
+export default function ReportsIndex({ devices, tilesets }: PageProps) {
     const [activeTab, setActiveTab] = useUrlFilter('tab', 'raw-gps');
 
     return (
@@ -3313,7 +3276,10 @@ export default function ReportsIndex({ devices }: PageProps) {
                     </TabsContent>
 
                     <TabsContent value="tracking">
-                        <TrackingMonitoringTab devices={devices} />
+                        <TrackingMonitoringTab
+                            devices={devices}
+                            tilesets={tilesets}
+                        />
                     </TabsContent>
 
                     <TabsContent value="productivity">

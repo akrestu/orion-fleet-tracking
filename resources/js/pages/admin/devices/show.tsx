@@ -10,7 +10,7 @@ import {
 } from '@tanstack/react-table';
 import { ArrowLeft, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { Badge, StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -52,11 +52,6 @@ type GpsLogRow = {
 type PageProps = {
     device: AdminDevice;
     gpsLogs: GpsLogRow[];
-};
-
-const STATUS_BADGE: Record<'online' | 'offline', string> = {
-    online: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20',
-    offline: 'bg-slate-500/15 text-slate-500 border-slate-500/20',
 };
 
 function DeviceInfoCard({ device }: { device: AdminDevice }) {
@@ -104,22 +99,13 @@ function DeviceInfoCard({ device }: { device: AdminDevice }) {
                     <div>
                         <dt className="text-muted-foreground">Status</dt>
                         <dd>
-                            <Badge variant="outline" className={STATUS_BADGE[device.status]}>
-                                {device.status}
-                            </Badge>
+                            <StatusBadge status={device.status} />
                         </dd>
                     </div>
                     <div>
                         <dt className="text-muted-foreground">Active</dt>
                         <dd>
-                            <Badge
-                                variant="outline"
-                                className={
-                                    device.is_active
-                                        ? 'border-emerald-500/20 bg-emerald-500/15 text-emerald-600'
-                                        : 'border-slate-500/20 bg-slate-500/15 text-slate-500'
-                                }
-                            >
+                            <Badge variant={device.is_active ? 'online' : 'offline'}>
                                 {device.is_active ? 'Yes' : 'No'}
                             </Badge>
                         </dd>

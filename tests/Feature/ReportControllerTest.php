@@ -4,6 +4,7 @@ use App\Models\Alert;
 use App\Models\Device;
 use App\Models\Geofence;
 use App\Models\GpsLog;
+use App\Models\MapTileset;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -19,7 +20,31 @@ it('allows admin to view reports page', function () {
     $this->actingAs($this->admin)
         ->get('/admin/reports')
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('admin/reports/index'));
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/reports/index')
+            ->has('tilesets')
+        );
+});
+
+it('passes map tilesets to the reports page', function () {
+    $tileset = MapTileset::create([
+        'name' => 'Satellite Overlay',
+        'slug' => 'satellite-overlay',
+        'min_zoom' => 0,
+        'max_zoom' => 19,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/reports')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('admin/reports/index')
+            ->has('tilesets', 1)
+            ->where('tilesets.0.id', $tileset->id)
+            ->where('tilesets.0.name', $tileset->name)
+            ->where('tilesets.0.slug', $tileset->slug)
+            ->where('tilesets.0.tile_url', fn ($url) => str_contains($url, "map-tiles/{$tileset->slug}/{z}/{x}/{y}.png"))
+        );
 });
 
 it('denies operator access to reports page', function () {

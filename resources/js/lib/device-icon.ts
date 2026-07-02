@@ -1,6 +1,7 @@
 import L from 'leaflet';
 import { UNIT_CATEGORIES } from '@/config/unit-types';
 import type { UnitCategory } from '@/config/unit-types';
+import { getStatusColor } from '@/lib/status-colors';
 
 const BADGE_SIZE = 30;
 const CONE_LENGTH = 11;
@@ -11,14 +12,19 @@ const CONE_LENGTH = 11;
  * cone that rotates independently around it. Replaces the previous mix of
  * photographic PNG sprites (4 types) and hand-drawn SVG silhouettes (the
  * other 4), which read as two different art styles on the live map.
+ *
+ * Follows the Orion design system's two-encoding rule: fill = unit type
+ * (identity), ring = status (safety) — the same split used by StatusBadge
+ * and MapMarker, so a unit reads the same way everywhere it appears.
  */
-function buildBadgeSvg(color: string, abbr: string): string {
-    const r = BADGE_SIZE / 2 - 2;
+function buildBadgeSvg(color: string, abbr: string, ringColor: string): string {
+    const r = BADGE_SIZE / 2 - 3;
     const cx = BADGE_SIZE / 2;
     const cy = BADGE_SIZE / 2;
 
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BADGE_SIZE} ${BADGE_SIZE}" width="${BADGE_SIZE}" height="${BADGE_SIZE}">
-  <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="white" stroke-width="2"/>
+  <circle cx="${cx}" cy="${cy}" r="${r + 1.5}" fill="none" stroke="${ringColor}" stroke-width="2"/>
+  <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="white" stroke-width="1.5"/>
   <text x="${cx}" y="${cy + 3.5}" font-size="10" font-weight="700" text-anchor="middle" fill="white" font-family="sans-serif">${abbr}</text>
 </svg>`;
 }
@@ -44,13 +50,14 @@ export function createDeviceIcon(device: DeviceIconInput): L.DivIcon {
     const cat = UNIT_CATEGORIES[device.unit_type] ?? UNIT_CATEGORIES.other;
     const { color } = cat;
     const isOnline = device.status === 'online';
+    const ringColor = getStatusColor(isOnline);
     const hasHeading = device.heading_deg !== null;
     const heading = device.heading_deg ?? 0;
-    const opacity = isOnline ? '1' : '0.55';
-    const grayscale = isOnline ? '' : 'grayscale(0.85) ';
-    const glow = isOnline
-        ? `filter:drop-shadow(0 0 4px color-mix(in oklch, ${color} 80%, transparent));`
-        : '';
+    // Offline units recede slightly, but keep full color — status is carried
+    // by the ring, not by desaturating the unit-type fill (which would blur
+    // the identity/status split and break colorblind-safe reading).
+    const opacity = isOnline ? '1' : '0.8';
+    const glow = `filter:drop-shadow(0 0 3px color-mix(in oklch, ${ringColor} 70%, transparent));`;
     const label = device.device_name ?? cat.abbr;
 
     const labelBg = isOnline ? 'rgba(0,0,0,0.65)' : 'rgba(100,100,100,0.55)';
@@ -80,10 +87,10 @@ export function createDeviceIcon(device: DeviceIconInput): L.DivIcon {
     const iconH = BADGE_SIZE + 16;
 
     const iconHtml = `
-        <div style="display:flex;flex-direction:column;align-items:center;opacity:${opacity};filter:${grayscale}">
+        <div style="display:flex;flex-direction:column;align-items:center;opacity:${opacity}">
             <div style="position:relative;${glow}">
                 ${coneHtml}
-                ${buildBadgeSvg(color, cat.abbr)}
+                ${buildBadgeSvg(color, cat.abbr, ringColor)}
             </div>
             ${labelHtml}
         </div>`;

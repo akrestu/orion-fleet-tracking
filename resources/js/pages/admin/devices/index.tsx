@@ -13,7 +13,7 @@ import { ArrowUpDown, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import DeviceController from '@/actions/App/Http/Controllers/Admin/DeviceController';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeVariant, StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -80,15 +80,13 @@ type PageProps = {
     groups: DeviceGroupRef[];
 };
 
-const STATUS_BADGE: Record<'online' | 'offline', string> = {
-    online: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20',
-    offline: 'bg-slate-500/15 text-slate-500 border-slate-500/20',
-};
-
-const OPERATIONAL_STATUS_BADGE: Record<OperationalStatus, string> = {
-    operational: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/20',
-    standby:     'bg-amber-500/15 text-amber-600 border-amber-500/20',
-    breakdown:   'bg-red-500/15 text-red-600 border-red-500/20',
+// Operational status is a domain-specific 3-state condition, mapped onto the
+// same 4-state Orion status vocabulary (online/warning/danger) so it reads
+// with the same colors as device connectivity everywhere else in the app.
+const OPERATIONAL_STATUS_VARIANT: Record<OperationalStatus, BadgeVariant> = {
+    operational: 'online',
+    standby: 'warning',
+    breakdown: 'danger',
 };
 
 const OPERATIONAL_STATUS_LABEL: Record<OperationalStatus, string> = {
@@ -551,14 +549,7 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
         {
             accessorKey: 'status',
             header: 'GPS',
-            cell: ({ row }) => {
-                const status = row.original.status;
-                return (
-                    <Badge variant="outline" className={STATUS_BADGE[status]}>
-                        {status}
-                    </Badge>
-                );
-            },
+            cell: ({ row }) => <StatusBadge status={row.original.status} />,
         },
         {
             accessorKey: 'operational_status',
@@ -566,7 +557,7 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             cell: ({ row }) => {
                 const os = row.original.operational_status;
                 return (
-                    <Badge variant="outline" className={OPERATIONAL_STATUS_BADGE[os]}>
+                    <Badge variant={OPERATIONAL_STATUS_VARIANT[os]}>
                         {OPERATIONAL_STATUS_LABEL[os]}
                     </Badge>
                 );
@@ -577,13 +568,9 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             header: 'Active',
             cell: ({ row }) =>
                 row.original.is_active ? (
-                    <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/20">
-                        Yes
-                    </Badge>
+                    <Badge variant="online">Yes</Badge>
                 ) : (
-                    <Badge variant="outline" className="bg-slate-500/15 text-slate-500 border-slate-500/20">
-                        No
-                    </Badge>
+                    <Badge variant="offline">No</Badge>
                 ),
         },
         {

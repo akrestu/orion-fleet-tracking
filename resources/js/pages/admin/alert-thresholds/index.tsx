@@ -448,13 +448,9 @@ export default function AlertThresholdsIndex({ thresholds, devices, alertTypes, 
                                         </TableCell>
                                         <TableCell>
                                             {t.is_active ? (
-                                                <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/15 text-emerald-600">
-                                                    Active
-                                                </Badge>
+                                                <Badge variant="online">Active</Badge>
                                             ) : (
-                                                <Badge variant="outline" className="border-slate-500/20 bg-slate-500/15 text-slate-500">
-                                                    Inactive
-                                                </Badge>
+                                                <Badge variant="offline">Inactive</Badge>
                                             )}
                                         </TableCell>
                                         <TableCell>

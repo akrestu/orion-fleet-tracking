@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Alert;
 use App\Models\Device;
 use App\Models\GpsLog;
+use App\Models\MapTileset;
 use App\Services\ReportService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
@@ -32,8 +33,18 @@ class ReportController extends Controller
                 'unit_type' => $d->unit_type,
             ]);
 
+        $tilesets = MapTileset::orderBy('name')->get()->map(fn (MapTileset $t) => [
+            'id' => $t->id,
+            'name' => $t->name,
+            'slug' => $t->slug,
+            'min_zoom' => $t->min_zoom,
+            'max_zoom' => $t->max_zoom,
+            'tile_url' => asset("storage/map-tiles/{$t->slug}/{z}/{x}/{y}.png"),
+        ]);
+
         return Inertia::render('admin/reports/index', [
             'devices' => $devices,
+            'tilesets' => $tilesets,
         ]);
     }
 

@@ -31,6 +31,16 @@ export const STATUS_OFFLINE = 'var(--color-status-offline)';
 export const STATUS_WARNING = 'var(--color-status-warning)';
 export const STATUS_DANGER = 'var(--color-status-danger)';
 
+/** Per-status foreground color var, for inline styles where a Tailwind
+ *  utility class can't be statically named (e.g. a marker colored per
+ *  status prop). */
+export const STATUS_COLOR_VAR: Record<DeviceStatus, string> = {
+    online: STATUS_ONLINE,
+    offline: STATUS_OFFLINE,
+    warning: STATUS_WARNING,
+    danger: STATUS_DANGER,
+};
+
 const SPEED_COLORS: Record<SpeedBand, string> = {
     slow: 'var(--color-speed-slow)',
     moderate: 'var(--color-speed-moderate)',

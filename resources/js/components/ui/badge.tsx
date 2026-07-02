@@ -33,6 +33,11 @@ const badgeVariants = cva(
   }
 )
 
+// Shared variant type so per-domain Record<Enum, Variant> maps (alert types,
+// operational status, zone types, audit events, etc.) stay in sync with the
+// variants actually defined in `badgeVariants` above.
+export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>
+
 function Badge({
   className,
   variant,
