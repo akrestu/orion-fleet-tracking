@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateSystemSettingsRequest;
 use App\Models\ApiToken;
 use App\Models\AuditLog;
+use App\Models\DeviceGroup;
 use App\Models\SystemSetting;
 use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
@@ -24,7 +25,7 @@ class SystemSettingController extends Controller
 
         $tokens = ApiToken::with('creator:id,name')
             ->orderByDesc('created_at')
-            ->get(['id', 'name', 'token_prefix', 'abilities', 'last_used_at', 'expires_at', 'created_by', 'created_at']);
+            ->get(['id', 'name', 'token_prefix', 'abilities', 'device_group_ids', 'last_used_at', 'expires_at', 'created_by', 'created_at']);
 
         $logs = AuditLog::with('user:id,name')
             ->orderByDesc('created_at')
@@ -45,11 +46,13 @@ class SystemSettingController extends Controller
                 'name' => $t->name,
                 'token_preview' => ($t->token_prefix ?? '????????').'...',
                 'abilities' => $t->abilities ?? [],
+                'device_group_ids' => $t->device_group_ids,
                 'last_used_at' => $t->last_used_at?->diffForHumans(),
                 'expires_at' => $t->expires_at?->toDateString(),
                 'created_by' => $t->creator?->name,
                 'created_at' => $t->created_at->diffForHumans(),
             ]),
+            'deviceGroups' => DeviceGroup::orderBy('name')->get(['id', 'name']),
             'auditLogs' => [
                 'data' => $logs->map(fn (AuditLog $log) => [
                     'id' => $log->id,

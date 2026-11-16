@@ -1,21 +1,21 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
 import {
-    type ColumnDef,
     flexRender,
     getCoreRowModel,
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
-    type SortingState,
     useReactTable,
 } from '@tanstack/react-table';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { ArrowUpDown, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import UserController from '@/actions/App/Http/Controllers/Admin/UserController';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import {
     Dialog,
     DialogContent,
@@ -73,12 +73,21 @@ function UserFormFields({
     showPassword,
 }: {
     errors: Partial<Record<string, string>>;
-    values: { name: string; email: string; role: string; password?: string; password_confirmation?: string };
+    values: {
+        name: string;
+        email: string;
+        role: string;
+        password?: string;
+        password_confirmation?: string;
+    };
     onChange: (field: string, value: string) => void;
     roles: RoleOption[];
     showPassword: boolean;
 }) {
-    const roleOptions: ComboboxOption[] = roles.map((r) => ({ value: r.value, label: r.label }));
+    const roleOptions: ComboboxOption[] = roles.map((r) => ({
+        value: r.value,
+        label: r.label,
+    }));
 
     return (
         <div className="space-y-4">
@@ -127,7 +136,9 @@ function UserFormFields({
                             id="password"
                             type="password"
                             value={values.password ?? ''}
-                            onChange={(e) => onChange('password', e.target.value)}
+                            onChange={(e) =>
+                                onChange('password', e.target.value)
+                            }
                             placeholder="••••••••"
                             autoComplete="new-password"
                         />
@@ -135,12 +146,19 @@ function UserFormFields({
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="password_confirmation">Confirm Password</Label>
+                        <Label htmlFor="password_confirmation">
+                            Confirm Password
+                        </Label>
                         <Input
                             id="password_confirmation"
                             type="password"
                             value={values.password_confirmation ?? ''}
-                            onChange={(e) => onChange('password_confirmation', e.target.value)}
+                            onChange={(e) =>
+                                onChange(
+                                    'password_confirmation',
+                                    e.target.value,
+                                )
+                            }
                             placeholder="••••••••"
                             autoComplete="new-password"
                         />
@@ -180,28 +198,53 @@ function CreateUserDialog({ roles }: { roles: RoleOption[] }) {
                 Add User
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Create User</DialogTitle>
-                        <DialogDescription>Add a new user to the system.</DialogDescription>
+                        <DialogDescription>
+                            Add a new user to the system.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form id="create-user-form" onSubmit={handleSubmit} className="py-2">
+                    <form
+                        id="create-user-form"
+                        onSubmit={handleSubmit}
+                        className="py-2"
+                    >
                         <UserFormFields
                             errors={errors}
                             values={data}
-                            onChange={(field, value) => setData(field as keyof typeof data, value)}
+                            onChange={(field, value) =>
+                                setData(field as keyof typeof data, value)
+                            }
                             roles={roles}
                             showPassword
                         />
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" form="create-user-form" disabled={processing}>
+                        <Button
+                            type="submit"
+                            form="create-user-form"
+                            disabled={processing}
+                        >
                             Create User
                         </Button>
                     </DialogFooter>
@@ -211,7 +254,13 @@ function CreateUserDialog({ roles }: { roles: RoleOption[] }) {
     );
 }
 
-function EditUserDialog({ user, roles }: { user: AdminUser; roles: RoleOption[] }) {
+function EditUserDialog({
+    user,
+    roles,
+}: {
+    user: AdminUser;
+    roles: RoleOption[];
+}) {
     const [open, setOpen] = useState(false);
 
     const { data, setData, put, processing, errors, reset } = useForm({
@@ -235,7 +284,11 @@ function EditUserDialog({ user, roles }: { user: AdminUser; roles: RoleOption[] 
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => {
-                    setData({ name: user.name, email: user.email, role: user.role });
+                    setData({
+                        name: user.name,
+                        email: user.email,
+                        role: user.role,
+                    });
                     setOpen(true);
                 }}
             >
@@ -243,28 +296,53 @@ function EditUserDialog({ user, roles }: { user: AdminUser; roles: RoleOption[] 
                 <span className="sr-only">Edit {user.name}</span>
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Edit User</DialogTitle>
-                        <DialogDescription>Update {user.name}'s information.</DialogDescription>
+                        <DialogDescription>
+                            Update {user.name}'s information.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form id={`edit-user-form-${user.id}`} onSubmit={handleSubmit} className="py-2">
+                    <form
+                        id={`edit-user-form-${user.id}`}
+                        onSubmit={handleSubmit}
+                        className="py-2"
+                    >
                         <UserFormFields
                             errors={errors}
                             values={data}
-                            onChange={(field, value) => setData(field as keyof typeof data, value)}
+                            onChange={(field, value) =>
+                                setData(field as keyof typeof data, value)
+                            }
                             roles={roles}
                             showPassword={false}
                         />
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" form={`edit-user-form-${user.id}`} disabled={processing}>
+                        <Button
+                            type="submit"
+                            form={`edit-user-form-${user.id}`}
+                            disabled={processing}
+                        >
                             Save Changes
                         </Button>
                     </DialogFooter>
@@ -306,25 +384,43 @@ function ResetPasswordDialog({ user }: { user: AdminUser }) {
                 <span className="sr-only">Reset password for {user.name}</span>
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
                         <DialogTitle>Reset Password</DialogTitle>
                         <DialogDescription>
-                            Set a new password for <strong>{user.name}</strong>. They will need to use this password
-                            on their next login.
+                            Set a new password for <strong>{user.name}</strong>.
+                            They will need to use this password on their next
+                            login.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form id={`reset-password-form-${user.id}`} onSubmit={handleSubmit} className="py-2">
+                    <form
+                        id={`reset-password-form-${user.id}`}
+                        onSubmit={handleSubmit}
+                        className="py-2"
+                    >
                         <div className="space-y-4">
                             <div className="grid gap-2">
-                                <Label htmlFor={`new-password-${user.id}`}>New Password</Label>
+                                <Label htmlFor={`new-password-${user.id}`}>
+                                    New Password
+                                </Label>
                                 <Input
                                     id={`new-password-${user.id}`}
                                     type="password"
                                     value={data.password}
-                                    onChange={(e) => setData('password', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('password', e.target.value)
+                                    }
                                     placeholder="••••••••"
                                     autoComplete="new-password"
                                 />
@@ -332,12 +428,21 @@ function ResetPasswordDialog({ user }: { user: AdminUser }) {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor={`new-password-confirm-${user.id}`}>Confirm New Password</Label>
+                                <Label
+                                    htmlFor={`new-password-confirm-${user.id}`}
+                                >
+                                    Confirm New Password
+                                </Label>
                                 <Input
                                     id={`new-password-confirm-${user.id}`}
                                     type="password"
                                     value={data.password_confirmation}
-                                    onChange={(e) => setData('password_confirmation', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'password_confirmation',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="••••••••"
                                     autoComplete="new-password"
                                 />
@@ -346,10 +451,18 @@ function ResetPasswordDialog({ user }: { user: AdminUser }) {
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" form={`reset-password-form-${user.id}`} disabled={processing}>
+                        <Button
+                            type="submit"
+                            form={`reset-password-form-${user.id}`}
+                            disabled={processing}
+                        >
                             Reset Password
                         </Button>
                     </DialogFooter>
@@ -359,7 +472,13 @@ function ResetPasswordDialog({ user }: { user: AdminUser }) {
     );
 }
 
-function DeleteUserDialog({ user, currentUserId }: { user: AdminUser; currentUserId: number }) {
+function DeleteUserDialog({
+    user,
+    currentUserId,
+}: {
+    user: AdminUser;
+    currentUserId: number;
+}) {
     const [open, setOpen] = useState(false);
     const { delete: destroy, processing } = useForm({});
 
@@ -380,7 +499,11 @@ function DeleteUserDialog({ user, currentUserId }: { user: AdminUser; currentUse
                 className="h-8 w-8 text-destructive hover:text-destructive"
                 onClick={() => setOpen(true)}
                 disabled={isSelf}
-                title={isSelf ? 'Cannot delete your own account' : `Delete ${user.name}`}
+                title={
+                    isSelf
+                        ? 'Cannot delete your own account'
+                        : `Delete ${user.name}`
+                }
             >
                 <Trash2 className="h-4 w-4" />
                 <span className="sr-only">Delete {user.name}</span>
@@ -391,14 +514,23 @@ function DeleteUserDialog({ user, currentUserId }: { user: AdminUser; currentUse
                     <DialogHeader>
                         <DialogTitle>Delete User</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete <strong>{user.name}</strong>? This action cannot be undone.
+                            Are you sure you want to delete{' '}
+                            <strong>{user.name}</strong>? This action cannot be
+                            undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button variant="destructive" onClick={handleDelete} disabled={processing}>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDelete}
+                            disabled={processing}
+                        >
                             Delete
                         </Button>
                     </DialogFooter>
@@ -408,7 +540,13 @@ function DeleteUserDialog({ user, currentUserId }: { user: AdminUser; currentUse
     );
 }
 
-export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles: RoleOption[] }) {
+export default function UsersIndex({
+    users,
+    roles,
+}: {
+    users: AdminUser[];
+    roles: RoleOption[];
+}) {
     const { auth } = usePage<PageProps>().props;
     const [sorting, setSorting] = useState<SortingState>([]);
     const [globalFilter, setGlobalFilter] = useState('');
@@ -419,7 +557,10 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
         ...roles.map((r) => ({ value: r.value, label: r.label })),
     ];
 
-    const filteredUsers = roleFilter === 'all' ? users : users.filter((u) => u.role === roleFilter);
+    const filteredUsers =
+        roleFilter === 'all'
+            ? users
+            : users.filter((u) => u.role === roleFilter);
 
     const columns: ColumnDef<AdminUser>[] = [
         {
@@ -428,7 +569,9 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
                 <Button
                     variant="ghost"
                     className="-ml-3 h-8"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
                 >
                     Name
                     <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -444,6 +587,7 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
             header: 'Role',
             cell: ({ row }) => {
                 const role = row.original.role;
+
                 return (
                     <Badge variant="outline" className={ROLE_BADGE[role]}>
                         {row.original.role_label}
@@ -457,7 +601,9 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
                 <Button
                     variant="ghost"
                     className="-ml-3 h-8"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
                 >
                     Joined
                     <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -471,7 +617,10 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
                 <div className="flex items-center justify-end gap-1">
                     <ResetPasswordDialog user={row.original} />
                     <EditUserDialog user={row.original} roles={roles} />
-                    <DeleteUserDialog user={row.original} currentUserId={auth.user.id} />
+                    <DeleteUserDialog
+                        user={row.original}
+                        currentUserId={auth.user.id}
+                    />
                 </div>
             ),
         },
@@ -497,8 +646,12 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
             <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">User Management</h1>
-                        <p className="text-sm text-muted-foreground">Manage system users and their roles.</p>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            User Management
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Manage system users and their roles.
+                        </p>
                     </div>
                     <CreateUserDialog roles={roles} />
                 </div>
@@ -530,7 +683,11 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
                                             <TableHead key={header.id}>
                                                 {header.isPlaceholder
                                                     ? null
-                                                    : flexRender(header.column.columnDef.header, header.getContext())}
+                                                    : flexRender(
+                                                          header.column
+                                                              .columnDef.header,
+                                                          header.getContext(),
+                                                      )}
                                             </TableHead>
                                         ))}
                                     </TableRow>
@@ -540,16 +697,25 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
                                 {table.getRowModel().rows.length ? (
                                     table.getRowModel().rows.map((row) => (
                                         <TableRow key={row.id}>
-                                            {row.getVisibleCells().map((cell) => (
-                                                <TableCell key={cell.id}>
-                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                                </TableCell>
-                                            ))}
+                                            {row
+                                                .getVisibleCells()
+                                                .map((cell) => (
+                                                    <TableCell key={cell.id}>
+                                                        {flexRender(
+                                                            cell.column
+                                                                .columnDef.cell,
+                                                            cell.getContext(),
+                                                        )}
+                                                    </TableCell>
+                                                ))}
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                        <TableCell
+                                            colSpan={columns.length}
+                                            className="h-24 text-center text-muted-foreground"
+                                        >
                                             No users found.
                                         </TableCell>
                                     </TableRow>
@@ -559,7 +725,10 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
                     </div>
 
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{table.getFilteredRowModel().rows.length} user(s) total</span>
+                        <span>
+                            {table.getFilteredRowModel().rows.length} user(s)
+                            total
+                        </span>
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"
@@ -570,7 +739,8 @@ export default function UsersIndex({ users, roles }: { users: AdminUser[]; roles
                                 Previous
                             </Button>
                             <span>
-                                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                                Page {table.getState().pagination.pageIndex + 1}{' '}
+                                of {table.getPageCount()}
                             </span>
                             <Button
                                 variant="outline"

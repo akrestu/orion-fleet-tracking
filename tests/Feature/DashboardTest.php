@@ -18,7 +18,7 @@ test('authenticated users can visit the dashboard', function () {
 });
 
 test('dashboard exposes maintenance and gateway signal data', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->admin()->create();
     $this->actingAs($user);
 
     $device = Device::factory()->create();
@@ -42,7 +42,7 @@ test('dashboard exposes maintenance and gateway signal data', function () {
 });
 
 test('dashboard exposes unit type counts and alert summary as plain arrays', function () {
-    $user = User::factory()->create();
+    $user = User::factory()->admin()->create();
     $this->actingAs($user);
 
     Device::factory()->create(['unit_type' => 'oht']);

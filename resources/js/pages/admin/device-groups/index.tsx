@@ -18,7 +18,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { index as adminDeviceGroupsIndex } from '@/routes/admin/device-groups';
 
 type GroupUser = {
@@ -117,7 +124,10 @@ function GroupFormFields({
 
             <div className="grid gap-2">
                 <Label htmlFor="location">
-                    Location <span className="text-muted-foreground font-normal">(optional)</span>
+                    Location{' '}
+                    <span className="font-normal text-muted-foreground">
+                        (optional)
+                    </span>
                 </Label>
                 <Input
                     id="location"
@@ -131,7 +141,10 @@ function GroupFormFields({
 
             <div className="grid gap-2">
                 <Label htmlFor="description">
-                    Description <span className="text-muted-foreground font-normal">(optional)</span>
+                    Description{' '}
+                    <span className="font-normal text-muted-foreground">
+                        (optional)
+                    </span>
                 </Label>
                 <Input
                     id="description"
@@ -153,7 +166,9 @@ function GroupFormFields({
                         onChange={(e) => onChange('color', e.target.value)}
                         className="h-9 w-14 cursor-pointer rounded border p-0.5"
                     />
-                    <span className="text-muted-foreground font-mono text-sm">{values.color}</span>
+                    <span className="font-mono text-sm text-muted-foreground">
+                        {values.color}
+                    </span>
                 </div>
                 <InputError message={errors.color} />
             </div>
@@ -162,21 +177,38 @@ function GroupFormFields({
             <div className="grid gap-2">
                 <Label>Assign Devices</Label>
                 {availableDevices.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No available (ungrouped) devices.</p>
+                    <p className="text-sm text-muted-foreground">
+                        No available (ungrouped) devices.
+                    </p>
                 ) : (
                     <ScrollArea className="h-44 rounded-md border p-2">
                         <div className="space-y-2">
                             {availableDevices.map((d) => (
-                                <div key={d.id} className="flex items-center gap-2">
+                                <div
+                                    key={d.id}
+                                    className="flex items-center gap-2"
+                                >
                                     <Checkbox
                                         id={`dev-${d.id}`}
-                                        checked={values.device_ids.includes(d.id)}
-                                        onCheckedChange={() => toggleDevice(d.id)}
+                                        checked={values.device_ids.includes(
+                                            d.id,
+                                        )}
+                                        onCheckedChange={() =>
+                                            toggleDevice(d.id)
+                                        }
                                     />
-                                    <Label htmlFor={`dev-${d.id}`} className="flex flex-1 cursor-pointer items-center gap-2 font-normal">
+                                    <Label
+                                        htmlFor={`dev-${d.id}`}
+                                        className="flex flex-1 cursor-pointer items-center gap-2 font-normal"
+                                    >
                                         <span>{d.device_name}</span>
-                                        <span className="text-muted-foreground font-mono text-xs">{d.dev_eui}</span>
-                                        <Badge variant="outline" className="ml-auto text-xs">
+                                        <span className="font-mono text-xs text-muted-foreground">
+                                            {d.dev_eui}
+                                        </span>
+                                        <Badge
+                                            variant="outline"
+                                            className="ml-auto text-xs"
+                                        >
                                             {d.unit_type}
                                         </Badge>
                                     </Label>
@@ -192,7 +224,9 @@ function GroupFormFields({
             <div className="grid gap-2">
                 <Label>Access — Operators & Admins</Label>
                 {operators.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No operators available.</p>
+                    <p className="text-sm text-muted-foreground">
+                        No operators available.
+                    </p>
                 ) : (
                     <div className="space-y-2 rounded-md border p-2">
                         {operators.map((u) => (
@@ -202,10 +236,18 @@ function GroupFormFields({
                                     checked={values.user_ids.includes(u.id)}
                                     onCheckedChange={() => toggleUser(u.id)}
                                 />
-                                <Label htmlFor={`user-${u.id}`} className="flex flex-1 cursor-pointer items-center gap-2 font-normal">
+                                <Label
+                                    htmlFor={`user-${u.id}`}
+                                    className="flex flex-1 cursor-pointer items-center gap-2 font-normal"
+                                >
                                     <span>{u.name}</span>
-                                    <span className="text-muted-foreground text-xs">{u.email}</span>
-                                    <Badge variant="outline" className={`ml-auto text-xs ${ROLE_BADGE[u.role]}`}>
+                                    <span className="text-xs text-muted-foreground">
+                                        {u.email}
+                                    </span>
+                                    <Badge
+                                        variant="outline"
+                                        className={`ml-auto text-xs ${ROLE_BADGE[u.role]}`}
+                                    >
                                         {u.role}
                                     </Badge>
                                 </Label>
@@ -257,26 +299,52 @@ function CreateGroupDialog({
                 New Group
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Create Device Group</DialogTitle>
-                        <DialogDescription>Group devices by site or project, and control operator access.</DialogDescription>
+                        <DialogDescription>
+                            Group devices by site or project, and control
+                            operator access.
+                        </DialogDescription>
                     </DialogHeader>
 
                     <form id="create-group-form" onSubmit={handleSubmit}>
                         <GroupFormFields
                             errors={errors}
                             values={data}
-                            onChange={(f, v) => setData(f as keyof typeof data, v as never)}
+                            onChange={(f, v) =>
+                                setData(f as keyof typeof data, v as never)
+                            }
                             operators={operators}
                             allDevices={allDevices}
                         />
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" form="create-group-form" disabled={processing}>Create Group</Button>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="create-group-form"
+                            disabled={processing}
+                        >
+                            Create Group
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -321,7 +389,7 @@ function EditGroupDialog({
                 device_ids: currentDeviceIds,
             });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -334,12 +402,26 @@ function EditGroupDialog({
 
     return (
         <>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setOpen(true)}>
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setOpen(true)}
+            >
                 <Pencil className="h-4 w-4" />
                 <span className="sr-only">Edit {group.name}</span>
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Edit Group</DialogTitle>
@@ -348,11 +430,16 @@ function EditGroupDialog({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form id={`edit-group-form-${group.id}`} onSubmit={handleSubmit}>
+                    <form
+                        id={`edit-group-form-${group.id}`}
+                        onSubmit={handleSubmit}
+                    >
                         <GroupFormFields
                             errors={errors}
                             values={data}
-                            onChange={(f, v) => setData(f as keyof typeof data, v as never)}
+                            onChange={(f, v) =>
+                                setData(f as keyof typeof data, v as never)
+                            }
                             operators={operators}
                             allDevices={allDevices}
                             groupId={group.id}
@@ -360,8 +447,20 @@ function EditGroupDialog({
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" form={`edit-group-form-${group.id}`} disabled={processing}>Save Changes</Button>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form={`edit-group-form-${group.id}`}
+                            disabled={processing}
+                        >
+                            Save Changes
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -399,12 +498,25 @@ function DeleteGroupDialog({ group }: { group: DeviceGroup }) {
                     <DialogHeader>
                         <DialogTitle>Delete Group</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete <strong>{group.name}</strong>? Devices in this group will become ungrouped.
+                            Are you sure you want to delete{' '}
+                            <strong>{group.name}</strong>? Devices in this group
+                            will become ungrouped.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button variant="destructive" onClick={handleDelete} disabled={processing}>Delete</Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDelete}
+                            disabled={processing}
+                        >
+                            Delete
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -414,7 +526,12 @@ function DeleteGroupDialog({ group }: { group: DeviceGroup }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, allDevices }: PageProps) {
+export default function DeviceGroupsIndex({
+    groups,
+    ungroupedCount,
+    operators,
+    allDevices,
+}: PageProps) {
     return (
         <>
             <Head title="Device Groups" />
@@ -422,10 +539,18 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
             <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Device Groups</h1>
-                        <p className="text-muted-foreground text-sm">Organise devices by site or project and control operator access per group.</p>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Device Groups
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Organise devices by site or project and control
+                            operator access per group.
+                        </p>
                     </div>
-                    <CreateGroupDialog operators={operators} allDevices={allDevices} />
+                    <CreateGroupDialog
+                        operators={operators}
+                        allDevices={allDevices}
+                    />
                 </div>
 
                 {/* Summary cards */}
@@ -434,11 +559,15 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Total Groups</p>
-                                    <p className="mt-1 text-3xl font-bold">{groups.length}</p>
+                                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                        Total Groups
+                                    </p>
+                                    <p className="mt-1 text-3xl font-bold">
+                                        {groups.length}
+                                    </p>
                                 </div>
-                                <div className="bg-muted rounded-lg p-2">
-                                    <Layers className="text-muted-foreground h-5 w-5" />
+                                <div className="rounded-lg bg-muted p-2">
+                                    <Layers className="h-5 w-5 text-muted-foreground" />
                                 </div>
                             </div>
                         </CardContent>
@@ -447,9 +576,14 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Grouped Devices</p>
+                                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                        Grouped Devices
+                                    </p>
                                     <p className="mt-1 text-3xl font-bold text-status-online">
-                                        {groups.reduce((sum, g) => sum + g.devices_count, 0)}
+                                        {groups.reduce(
+                                            (sum, g) => sum + g.devices_count,
+                                            0,
+                                        )}
                                     </p>
                                 </div>
                                 <div className="rounded-lg bg-status-online-bg p-2">
@@ -462,8 +596,12 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider">Ungrouped Devices</p>
-                                    <p className="mt-1 text-3xl font-bold text-status-warning">{ungroupedCount}</p>
+                                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                        Ungrouped Devices
+                                    </p>
+                                    <p className="mt-1 text-3xl font-bold text-status-warning">
+                                        {ungroupedCount}
+                                    </p>
                                 </div>
                                 <div className="rounded-lg bg-status-warning-bg p-2">
                                     <FolderOpen className="h-5 w-5 text-status-warning" />
@@ -477,16 +615,21 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                            <Layers className="text-muted-foreground h-4 w-4" />
+                            <Layers className="h-4 w-4 text-muted-foreground" />
                             All Groups
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {groups.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Layers className="text-muted-foreground/40 mb-2 h-10 w-10" />
-                                <p className="text-muted-foreground text-sm font-medium">No groups yet</p>
-                                <p className="text-muted-foreground/60 mt-1 text-xs">Create a group to organise your fleet by site or project.</p>
+                                <Layers className="mb-2 h-10 w-10 text-muted-foreground/40" />
+                                <p className="text-sm font-medium text-muted-foreground">
+                                    No groups yet
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground/60">
+                                    Create a group to organise your fleet by
+                                    site or project.
+                                </p>
                             </div>
                         ) : (
                             <Table>
@@ -506,44 +649,64 @@ export default function DeviceGroupsIndex({ groups, ungroupedCount, operators, a
                                                 <div className="flex items-center gap-2">
                                                     <span
                                                         className="inline-block h-3 w-3 flex-shrink-0 rounded-full"
-                                                        style={{ backgroundColor: group.color }}
+                                                        style={{
+                                                            backgroundColor:
+                                                                group.color,
+                                                        }}
                                                     />
-                                                    <span className="font-medium">{group.name}</span>
+                                                    <span className="font-medium">
+                                                        {group.name}
+                                                    </span>
                                                 </div>
                                                 {group.description && (
-                                                    <p className="text-muted-foreground mt-0.5 ml-5 text-xs">{group.description}</p>
+                                                    <p className="mt-0.5 ml-5 text-xs text-muted-foreground">
+                                                        {group.description}
+                                                    </p>
                                                 )}
                                             </TableCell>
-                                            <TableCell className="text-muted-foreground text-sm">
+                                            <TableCell className="text-sm text-muted-foreground">
                                                 {group.location ?? '—'}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline">
-                                                    {group.devices_count} device{group.devices_count !== 1 ? 's' : ''}
+                                                    {group.devices_count} device
+                                                    {group.devices_count !== 1
+                                                        ? 's'
+                                                        : ''}
                                                 </Badge>
                                             </TableCell>
                                             <TableCell>
                                                 {group.users.length === 0 ? (
-                                                    <span className="text-muted-foreground text-xs">No restriction</span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        No restriction
+                                                    </span>
                                                 ) : (
                                                     <div className="flex flex-wrap gap-1">
-                                                        {group.users.map((u) => (
-                                                            <Badge
-                                                                key={u.id}
-                                                                variant="outline"
-                                                                className={`text-xs ${ROLE_BADGE[u.role]}`}
-                                                            >
-                                                                <Users className="mr-1 h-3 w-3" />
-                                                                {u.name}
-                                                            </Badge>
-                                                        ))}
+                                                        {group.users.map(
+                                                            (u) => (
+                                                                <Badge
+                                                                    key={u.id}
+                                                                    variant="outline"
+                                                                    className={`text-xs ${ROLE_BADGE[u.role]}`}
+                                                                >
+                                                                    <Users className="mr-1 h-3 w-3" />
+                                                                    {u.name}
+                                                                </Badge>
+                                                            ),
+                                                        )}
                                                     </div>
                                                 )}
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <EditGroupDialog group={group} operators={operators} allDevices={allDevices} />
-                                                    <DeleteGroupDialog group={group} />
+                                                    <EditGroupDialog
+                                                        group={group}
+                                                        operators={operators}
+                                                        allDevices={allDevices}
+                                                    />
+                                                    <DeleteGroupDialog
+                                                        group={group}
+                                                    />
                                                 </div>
                                             </TableCell>
                                         </TableRow>

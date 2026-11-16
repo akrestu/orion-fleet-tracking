@@ -57,6 +57,14 @@ return [
     'chirpstack_app_id' => env('CHIRPSTACK_APP_ID'),
 
     /*
+    | Retention (days) before records are removed by the scheduled `model:prune`.
+    | Set to 0 to keep records forever.
+    */
+    'gps_log_retention_days' => (int) env('GPS_LOG_RETENTION_DAYS', 365),
+
+    'audit_log_retention_days' => (int) env('AUDIT_LOG_RETENTION_DAYS', 730),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

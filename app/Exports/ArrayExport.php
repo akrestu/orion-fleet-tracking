@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\SpreadsheetSanitizer;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -22,11 +23,17 @@ class ArrayExport implements FromArray, ShouldAutoSize, WithHeadings, WithTitle
         private readonly string $title = 'Sheet1',
     ) {}
 
+    /**
+     * @return array<int, array<array-key, mixed>>
+     */
     public function array(): array
     {
-        return $this->rows;
+        return array_map(SpreadsheetSanitizer::row(...), $this->rows);
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function headings(): array
     {
         return $this->headings;

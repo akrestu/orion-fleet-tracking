@@ -19,8 +19,8 @@ class ChirpstackUplinkReceived implements ShouldBroadcast
 
     /**
      * Scoped per device group so only users with access to that group receive
-     * the update. Also published on "fleet-tracking.all" for admins / unrestricted
-     * operators (see User::accessibleGroupIds()).
+     * the update. Also published on "fleet-tracking.all" for admins
+     * (see User::accessibleGroupIds()).
      *
      * @return array<int, PrivateChannel>
      */

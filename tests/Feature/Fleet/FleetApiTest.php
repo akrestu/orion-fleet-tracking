@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Device;
+use App\Models\DeviceGroup;
 use App\Models\GpsLog;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -9,7 +10,7 @@ uses(RefreshDatabase::class);
 
 function actingAsUser(): User
 {
-    $user = User::factory()->create();
+    $user = User::factory()->admin()->create();
     test()->actingAs($user);
 
     return $user;
@@ -149,5 +150,45 @@ describe('GET /api/fleet/devices/{devEui}/history', function () {
         Device::factory()->create(['dev_eui' => '9956efb31332a835']);
 
         $this->getJson('/api/fleet/devices/9956efb31332a835/history?from=not-a-date')->assertUnprocessable();
+    });
+});
+
+// ─── Device group scoping ────────────────────────────────────────────────────
+
+describe('device group scoping', function () {
+    it('shows nothing to a non-admin without group assignments', function () {
+        Device::factory()->create(['is_active' => true]);
+        $viewer = User::factory()->create();
+
+        expect($viewer->accessibleGroupIds())->toBe([]);
+
+        $this->actingAs($viewer)
+            ->getJson('/api/fleet/devices')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    });
+
+    it('limits a non-admin to devices in assigned groups', function () {
+        $groupA = DeviceGroup::factory()->create();
+        $groupB = DeviceGroup::factory()->create();
+        Device::factory()->create(['device_group_id' => $groupA->id]);
+        Device::factory()->create(['device_group_id' => $groupB->id]);
+
+        $operator = User::factory()->operator()->create();
+        $operator->deviceGroups()->attach($groupA);
+
+        $this->actingAs($operator)
+            ->getJson('/api/fleet/devices')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+    });
+
+    it('lets admins see every device', function () {
+        Device::factory()->count(2)->create();
+
+        $this->actingAs(User::factory()->admin()->create())
+            ->getJson('/api/fleet/devices')
+            ->assertOk()
+            ->assertJsonCount(2, 'data');
     });
 });

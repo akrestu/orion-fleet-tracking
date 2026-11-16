@@ -9,6 +9,7 @@ use App\Models\Device;
 use App\Models\GpsLog;
 use App\Models\MapTileset;
 use App\Services\ReportService;
+use App\Support\SpreadsheetSanitizer;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -157,9 +158,14 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($query) {
             $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
             fputcsv($handle, ['Device Name', 'DEV EUI', 'Unit Type', 'Latitude', 'Longitude', 'Speed (km/h)', 'Heading (°)', 'HDOP', 'Satellites', 'RSSI', 'SNR', 'Recorded At']);
 
-            $sanitize = fn (string $value): string => str_replace(["\r", "\n", "\t"], ' ', $value);
+            $sanitize = fn (string $value): mixed => SpreadsheetSanitizer::cell($value);
 
             $query->chunk(500, function ($logs) use ($handle, $sanitize) {
                 foreach ($logs as $log) {
@@ -206,9 +212,14 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($query) {
             $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
             fputcsv($handle, ['Device Name', 'DEV EUI', 'Unit Type', 'Alert Type', 'Speed (km/h)', 'Threshold (km/h)', 'Triggered At', 'Status', 'Resolved At']);
 
-            $sanitize = fn (string $value): string => str_replace(["\r", "\n", "\t"], ' ', $value);
+            $sanitize = fn (string $value): mixed => SpreadsheetSanitizer::cell($value);
 
             $query->chunk(500, function ($alerts) use ($handle, $sanitize) {
                 foreach ($alerts as $alert) {

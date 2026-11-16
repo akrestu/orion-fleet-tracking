@@ -3,11 +3,19 @@ import 'leaflet/dist/leaflet.css';
 import { Head, useForm } from '@inertiajs/react';
 import { MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { LayersControl, MapContainer, Polygon, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import {
+    LayersControl,
+    MapContainer,
+    Polygon,
+    TileLayer,
+    useMap,
+    useMapEvents,
+} from 'react-leaflet';
 import GeofenceController from '@/actions/App/Http/Controllers/Admin/GeofenceController';
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import InputError from '@/components/input-error';
-import { Badge, type BadgeVariant } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
+import type { BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -20,7 +28,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -98,8 +112,8 @@ function PolygonDrawer({
     });
 
     if (points.length === 0) {
-return null;
-}
+        return null;
+    }
 
     return (
         <Polygon
@@ -115,7 +129,6 @@ const DEFAULT_CENTER: [number, number] = [-3.779223, 103.67939];
 function PolygonMapDialog({
     open,
     initialPoints,
-    color,
     tilesets,
     onClose,
     onConfirm,
@@ -128,35 +141,45 @@ function PolygonMapDialog({
     onConfirm: (points: LatLng[]) => void;
 }) {
     const [points, setPoints] = useState<LatLng[]>(initialPoints);
+    const [wasOpen, setWasOpen] = useState(open);
 
-    useEffect(() => {
+    // Reset the drawn polygon each time the dialog opens (adjust-state-during-render pattern).
+    if (open !== wasOpen) {
+        setWasOpen(open);
+
         if (open) {
-setPoints(initialPoints);
-}
-    }, [open]);
+            setPoints(initialPoints);
+        }
+    }
 
     const activeBaseLayer = (() => {
-        const saved = localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER;
-        const available = ['Satelit (Esri)', 'OpenStreetMap', ...tilesets.map((t) => t.name)];
+        const saved =
+            localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER;
+        const available = [
+            'Satelit (Esri)',
+            'OpenStreetMap',
+            ...tilesets.map((t) => t.name),
+        ];
 
         return available.includes(saved) ? saved : DEFAULT_BASE_LAYER;
     })();
 
     const handleConfirm = () => {
         if (points.length < 3) {
-return;
-}
+            return;
+        }
 
         onConfirm(points);
     };
 
     return (
         <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden">
+            <DialogContent className="max-w-3xl gap-0 overflow-hidden p-0">
                 <DialogHeader className="px-6 pt-6 pb-4">
                     <DialogTitle>Draw Geofence Zone</DialogTitle>
                     <DialogDescription>
-                        Click on the map to add polygon vertices. Minimum 3 points required.
+                        Click on the map to add polygon vertices. Minimum 3
+                        points required.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -207,7 +230,9 @@ return;
                         <MapInvalidator />
                         <PolygonDrawer
                             points={points}
-                            onPointAdded={(p) => setPoints((prev) => [...prev, p])}
+                            onPointAdded={(p) =>
+                                setPoints((prev) => [...prev, p])
+                            }
                         />
                     </MapContainer>
 
@@ -219,7 +244,9 @@ return;
                     {points.length > 0 && (
                         <button
                             type="button"
-                            onClick={() => setPoints((prev) => prev.slice(0, -1))}
+                            onClick={() =>
+                                setPoints((prev) => prev.slice(0, -1))
+                            }
                             className="absolute top-3 right-3 z-[1000] flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
                         >
                             <X className="h-3 w-3" />
@@ -228,14 +255,17 @@ return;
                     )}
                 </div>
 
-                <DialogFooter className="px-6 py-4 border-t">
+                <DialogFooter className="border-t px-6 py-4">
                     <Button variant="outline" onClick={() => setPoints([])}>
                         Clear
                     </Button>
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button onClick={handleConfirm} disabled={points.length < 3}>
+                    <Button
+                        onClick={handleConfirm}
+                        disabled={points.length < 3}
+                    >
                         Use This Zone ({points.length} pts)
                     </Button>
                 </DialogFooter>
@@ -300,22 +330,33 @@ function GeofenceFormFields({
                             onChange={(e) => setData('color', e.target.value)}
                             className="h-9 w-14 cursor-pointer rounded-md border border-input bg-background p-1"
                         />
-                        <span className="text-sm text-muted-foreground font-mono">{data.color}</span>
+                        <span className="font-mono text-sm text-muted-foreground">
+                            {data.color}
+                        </span>
                     </div>
                     <InputError message={errors.color} />
                 </div>
 
                 <div className="grid gap-2">
                     <Label htmlFor="zone_type">Zone Type</Label>
-                    <Select value={data.zone_type} onValueChange={(v) => setData('zone_type', v)}>
+                    <Select
+                        value={data.zone_type}
+                        onValueChange={(v) => setData('zone_type', v)}
+                    >
                         <SelectTrigger id="zone_type">
                             <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="none">General</SelectItem>
-                            <SelectItem value="loading">Loading Zone</SelectItem>
-                            <SelectItem value="dumping">Dumping Zone</SelectItem>
-                            <SelectItem value="parking">Parking Zone</SelectItem>
+                            <SelectItem value="loading">
+                                Loading Zone
+                            </SelectItem>
+                            <SelectItem value="dumping">
+                                Dumping Zone
+                            </SelectItem>
+                            <SelectItem value="parking">
+                                Parking Zone
+                            </SelectItem>
                         </SelectContent>
                     </Select>
                     <InputError message={errors.zone_type} />
@@ -324,7 +365,12 @@ function GeofenceFormFields({
 
             <div className="grid gap-2">
                 <Label>Polygon Zone</Label>
-                <Button type="button" variant="outline" onClick={onDrawClick} className="w-full justify-start gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onDrawClick}
+                    className="w-full justify-start gap-2"
+                >
                     <MapPin className="h-4 w-4" />
                     {data.polygon.length >= 3
                         ? `Zone set (${data.polygon.length} vertices) — click to redraw`
@@ -350,14 +396,15 @@ function CreateGeofenceDialog({ tilesets }: { tilesets: Tileset[] }) {
     const [open, setOpen] = useState(false);
     const [mapOpen, setMapOpen] = useState(false);
 
-    const { data, setData, post, processing, errors, reset } = useForm<GeofenceFormData>({
-        name: '',
-        description: '',
-        color: '#f59e0b',
-        polygon: [],
-        is_active: true,
-        zone_type: 'none',
-    });
+    const { data, setData, post, processing, errors, reset } =
+        useForm<GeofenceFormData>({
+            name: '',
+            description: '',
+            color: '#f59e0b',
+            polygon: [],
+            is_active: true,
+            zone_type: 'none',
+        });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -383,8 +430,9 @@ function CreateGeofenceDialog({ tilesets }: { tilesets: Tileset[] }) {
                 color={data.color}
                 tilesets={tilesets}
                 onClose={() => {
- setMapOpen(false); setOpen(true); 
-}}
+                    setMapOpen(false);
+                    setOpen(true);
+                }}
                 onConfirm={(pts) => {
                     setData('polygon', pts);
                     setMapOpen(false);
@@ -392,17 +440,22 @@ function CreateGeofenceDialog({ tilesets }: { tilesets: Tileset[] }) {
                 }}
             />
 
-            <Dialog open={open} onOpenChange={(v) => {
- setOpen(v);
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
 
- if (!v) {
-reset();
-} 
-}}>
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Add Geofence Zone</DialogTitle>
-                        <DialogDescription>Draw a polygon zone and configure alert triggers.</DialogDescription>
+                        <DialogDescription>
+                            Draw a polygon zone and configure alert triggers.
+                        </DialogDescription>
                     </DialogHeader>
 
                     <form id="create-geofence-form" onSubmit={handleSubmit}>
@@ -411,14 +464,24 @@ reset();
                             setData={(k, v) => setData(k, v as never)}
                             errors={errors}
                             onDrawClick={() => {
- setOpen(false); setMapOpen(true); 
-}}
+                                setOpen(false);
+                                setMapOpen(true);
+                            }}
                         />
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" form="create-geofence-form" disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="create-geofence-form"
+                            disabled={processing}
+                        >
                             Create Zone
                         </Button>
                     </DialogFooter>
@@ -429,18 +492,25 @@ reset();
 }
 
 // ---- Edit dialog ----
-function EditGeofenceDialog({ geofence, tilesets }: { geofence: GeofenceRow; tilesets: Tileset[] }) {
+function EditGeofenceDialog({
+    geofence,
+    tilesets,
+}: {
+    geofence: GeofenceRow;
+    tilesets: Tileset[];
+}) {
     const [open, setOpen] = useState(false);
     const [mapOpen, setMapOpen] = useState(false);
 
-    const { data, setData, put, processing, errors, reset } = useForm<GeofenceFormData>({
-        name: geofence.name,
-        description: geofence.description ?? '',
-        color: geofence.color,
-        polygon: geofence.polygon,
-        is_active: geofence.is_active,
-        zone_type: geofence.zone_type,
-    });
+    const { data, setData, put, processing, errors, reset } =
+        useForm<GeofenceFormData>({
+            name: geofence.name,
+            description: geofence.description ?? '',
+            color: geofence.color,
+            polygon: geofence.polygon,
+            is_active: geofence.is_active,
+            zone_type: geofence.zone_type,
+        });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -464,7 +534,12 @@ function EditGeofenceDialog({ geofence, tilesets }: { geofence: GeofenceRow; til
 
     return (
         <>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleOpen}>
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleOpen}
+            >
                 <Pencil className="h-4 w-4" />
                 <span className="sr-only">Edit</span>
             </Button>
@@ -475,8 +550,9 @@ function EditGeofenceDialog({ geofence, tilesets }: { geofence: GeofenceRow; til
                 color={data.color}
                 tilesets={tilesets}
                 onClose={() => {
- setMapOpen(false); setOpen(true); 
-}}
+                    setMapOpen(false);
+                    setOpen(true);
+                }}
                 onConfirm={(pts) => {
                     setData('polygon', pts);
                     setMapOpen(false);
@@ -484,33 +560,52 @@ function EditGeofenceDialog({ geofence, tilesets }: { geofence: GeofenceRow; til
                 }}
             />
 
-            <Dialog open={open} onOpenChange={(v) => {
- setOpen(v);
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
 
- if (!v) {
-reset();
-} 
-}}>
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Edit Geofence Zone</DialogTitle>
-                        <DialogDescription>Update zone configuration for <strong>{geofence.name}</strong>.</DialogDescription>
+                        <DialogDescription>
+                            Update zone configuration for{' '}
+                            <strong>{geofence.name}</strong>.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form id={`edit-geofence-form-${geofence.id}`} onSubmit={handleSubmit}>
+                    <form
+                        id={`edit-geofence-form-${geofence.id}`}
+                        onSubmit={handleSubmit}
+                    >
                         <GeofenceFormFields
                             data={data}
                             setData={(k, v) => setData(k, v as never)}
                             errors={errors}
                             onDrawClick={() => {
- setOpen(false); setMapOpen(true); 
-}}
+                                setOpen(false);
+                                setMapOpen(true);
+                            }}
                         />
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" form={`edit-geofence-form-${geofence.id}`} disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form={`edit-geofence-form-${geofence.id}`}
+                            disabled={processing}
+                        >
                             Save Changes
                         </Button>
                     </DialogFooter>
@@ -542,19 +637,30 @@ function DeleteGeofenceDialog({ geofence }: { geofence: GeofenceRow }) {
                     <DialogHeader>
                         <DialogTitle>Delete Zone</DialogTitle>
                         <DialogDescription>
-                            Delete geofence zone <strong>{geofence.name}</strong>? All device states for this zone will also be removed. This cannot be undone.
+                            Delete geofence zone{' '}
+                            <strong>{geofence.name}</strong>? All device states
+                            for this zone will also be removed. This cannot be
+                            undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
                         <Button
                             variant="destructive"
                             disabled={processing}
                             onClick={() =>
-                                destroy(GeofenceController.destroy.url(geofence.id), {
-                                    preserveScroll: true,
-                                    onSuccess: () => setOpen(false),
-                                })
+                                destroy(
+                                    GeofenceController.destroy.url(geofence.id),
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: () => setOpen(false),
+                                    },
+                                )
                             }
                         >
                             Delete
@@ -575,9 +681,13 @@ export default function GeofencesIndex({ geofences, tilesets }: PageProps) {
             <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Geofence Zones</h1>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Geofence Zones
+                        </h1>
                         <p className="text-sm text-muted-foreground">
-                            Draw polygon zones on the map. Set zone type (Loading/Dumping/Parking) to enable Cycle Time detection.
+                            Draw polygon zones on the map. Set zone type
+                            (Loading/Dumping/Parking) to enable Cycle Time
+                            detection.
                         </p>
                     </div>
                     <CreateGeofenceDialog tilesets={tilesets} />
@@ -600,45 +710,74 @@ export default function GeofencesIndex({ geofences, tilesets }: PageProps) {
                                 geofences.map((g) => (
                                     <TableRow key={g.id}>
                                         <TableCell>
-                                            <div className="font-medium">{g.name}</div>
+                                            <div className="font-medium">
+                                                {g.name}
+                                            </div>
                                             {g.description && (
-                                                <div className="text-xs text-muted-foreground">{g.description}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {g.description}
+                                                </div>
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant={ZONE_TYPE_VARIANT[g.zone_type] ?? 'secondary'}>
-                                                {ZONE_TYPE_LABELS[g.zone_type] ?? 'General'}
+                                            <Badge
+                                                variant={
+                                                    ZONE_TYPE_VARIANT[
+                                                        g.zone_type
+                                                    ] ?? 'secondary'
+                                                }
+                                            >
+                                                {ZONE_TYPE_LABELS[
+                                                    g.zone_type
+                                                ] ?? 'General'}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center gap-2">
                                                 <span
                                                     className="inline-block h-4 w-4 rounded-sm border"
-                                                    style={{ background: g.color }}
+                                                    style={{
+                                                        background: g.color,
+                                                    }}
                                                 />
-                                                <span className="font-mono text-xs text-muted-foreground">{g.color}</span>
+                                                <span className="font-mono text-xs text-muted-foreground">
+                                                    {g.color}
+                                                </span>
                                             </div>
                                         </TableCell>
                                         <TableCell>{g.vertex_count}</TableCell>
                                         <TableCell>
                                             {g.is_active ? (
-                                                <Badge variant="online">Active</Badge>
+                                                <Badge variant="online">
+                                                    Active
+                                                </Badge>
                                             ) : (
-                                                <Badge variant="offline">Inactive</Badge>
+                                                <Badge variant="offline">
+                                                    Inactive
+                                                </Badge>
                                             )}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center justify-end gap-1">
-                                                <EditGeofenceDialog geofence={g} tilesets={tilesets} />
-                                                <DeleteGeofenceDialog geofence={g} />
+                                                <EditGeofenceDialog
+                                                    geofence={g}
+                                                    tilesets={tilesets}
+                                                />
+                                                <DeleteGeofenceDialog
+                                                    geofence={g}
+                                                />
                                             </div>
                                         </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                                        No geofence zones configured. Add one to start monitoring device boundaries.
+                                    <TableCell
+                                        colSpan={6}
+                                        className="h-24 text-center text-muted-foreground"
+                                    >
+                                        No geofence zones configured. Add one to
+                                        start monitoring device boundaries.
                                     </TableCell>
                                 </TableRow>
                             )}
@@ -651,7 +790,5 @@ export default function GeofencesIndex({ geofences, tilesets }: PageProps) {
 }
 
 GeofencesIndex.layout = {
-    breadcrumbs: [
-        { title: 'Geofences', href: adminGeofencesIndex() },
-    ],
+    breadcrumbs: [{ title: 'Geofences', href: adminGeofencesIndex() }],
 };

@@ -1,5 +1,6 @@
 import * as React from 'react';
 import * as RechartsPrimitive from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
 import { cn } from '@/lib/utils';
 
 // Format: { THEME_NAME: CSS_SELECTOR }
@@ -99,8 +100,8 @@ function ChartTooltipContent({
     color,
     nameKey,
     labelKey,
-}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
-    React.ComponentProps<'div'> & {
+}: Omit<React.ComponentProps<'div'>, 'content'> &
+    Partial<RechartsPrimitive.TooltipContentProps<ValueType, NameType>> & {
         hideLabel?: boolean;
         hideIndicator?: boolean;
         indicator?: 'line' | 'dot' | 'dashed';
@@ -141,7 +142,7 @@ function ChartTooltipContent({
 
                     return (
                         <div
-                            key={item.dataKey}
+                            key={`${String(item.dataKey ?? item.name)}-${index}`}
                             className={cn(
                                 '[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5',
                                 indicator === 'dot' && 'items-center',
@@ -201,7 +202,7 @@ function ChartLegendContent({
     verticalAlign = 'bottom',
     nameKey,
 }: React.ComponentProps<'div'> &
-    Pick<RechartsPrimitive.LegendProps, 'payload' | 'verticalAlign'> & {
+    Pick<RechartsPrimitive.DefaultLegendContentProps, 'payload' | 'verticalAlign'> & {
         hideIcon?: boolean;
         nameKey?: string;
     }) {

@@ -294,7 +294,7 @@ MQTT_PORT=1883
 MQTT_CLIENT_ID=orion-subscriber
 MQTT_USERNAME=
 MQTT_PASSWORD=
-CHIRPSTACK_APP_ID=7791e609-dbc6-4c9e-abc9-43e1c6c163d3
+CHIRPSTACK_APP_ID=<chirpstack-application-uuid>
 
 ### 3. Config file: config/mqtt.php
 Buat config file yang membaca dari .env di atas.

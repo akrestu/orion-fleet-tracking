@@ -80,7 +80,7 @@ class User extends Authenticatable implements PasskeyUser
     /**
      * Returns device_group_ids this user can access, or null if unrestricted.
      * Null means "see everything". Non-null means "only these groups".
-     * Operators with no group assignments are unrestricted (see all).
+     * Non-admins with no group assignments get an empty list (see nothing).
      * Result is cached per request via once() to avoid repeated DB hits.
      *
      * @return int[]|null
@@ -92,9 +92,7 @@ class User extends Authenticatable implements PasskeyUser
                 return null;
             }
 
-            $ids = $this->deviceGroups()->pluck('device_groups.id')->all();
-
-            return empty($ids) ? null : $ids;
+            return $this->deviceGroups()->pluck('device_groups.id')->all();
         });
     }
 }

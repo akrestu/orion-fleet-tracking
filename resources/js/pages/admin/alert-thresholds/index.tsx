@@ -6,7 +6,8 @@ import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import {
     Dialog,
     DialogContent,
@@ -144,21 +145,39 @@ function CreateThresholdDialog({
                 Add Threshold
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { reset(); setScope('global'); } }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                        setScope('global');
+                    }
+                }}
+            >
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Add Alert Threshold</DialogTitle>
-                        <DialogDescription>Configure a trigger threshold for an alert type.</DialogDescription>
+                        <DialogDescription>
+                            Configure a trigger threshold for an alert type.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form id="create-threshold-form" onSubmit={handleSubmit} className="py-2">
+                    <form
+                        id="create-threshold-form"
+                        onSubmit={handleSubmit}
+                        className="py-2"
+                    >
                         <div className="space-y-4">
                             <div className="grid gap-2">
                                 <Label>Alert Type</Label>
                                 <Combobox
                                     options={alertTypeOptions}
                                     value={data.alert_type}
-                                    onValueChange={(v) => setData('alert_type', v)}
+                                    onValueChange={(v) =>
+                                        setData('alert_type', v)
+                                    }
                                     placeholder="Select alert type"
                                     searchPlaceholder="Search alert type..."
                                 />
@@ -182,7 +201,9 @@ function CreateThresholdDialog({
                                     <Combobox
                                         options={unitTypeOptions}
                                         value={data.unit_type}
-                                        onValueChange={(v) => setData('unit_type', v)}
+                                        onValueChange={(v) =>
+                                            setData('unit_type', v)
+                                        }
                                         placeholder="Select unit type"
                                         searchPlaceholder="Search unit type..."
                                     />
@@ -196,7 +217,9 @@ function CreateThresholdDialog({
                                     <Combobox
                                         options={deviceOptions}
                                         value={data.dev_eui}
-                                        onValueChange={(v) => setData('dev_eui', v)}
+                                        onValueChange={(v) =>
+                                            setData('dev_eui', v)
+                                        }
                                         placeholder="Select device"
                                         searchPlaceholder="Search device..."
                                     />
@@ -219,7 +242,12 @@ function CreateThresholdDialog({
                                     step="0.01"
                                     min="0"
                                     value={data.threshold_value}
-                                    onChange={(e) => setData('threshold_value', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'threshold_value',
+                                            e.target.value,
+                                        )
+                                    }
                                     placeholder="e.g. 80"
                                 />
                                 <InputError message={errors.threshold_value} />
@@ -229,7 +257,9 @@ function CreateThresholdDialog({
                                 <Checkbox
                                     id="is_active"
                                     checked={data.is_active}
-                                    onCheckedChange={(v) => setData('is_active', Boolean(v))}
+                                    onCheckedChange={(v) =>
+                                        setData('is_active', Boolean(v))
+                                    }
                                 />
                                 <Label htmlFor="is_active">Active</Label>
                             </div>
@@ -237,10 +267,18 @@ function CreateThresholdDialog({
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" form="create-threshold-form" disabled={processing}>
+                        <Button
+                            type="submit"
+                            form="create-threshold-form"
+                            disabled={processing}
+                        >
                             Add Threshold
                         </Button>
                     </DialogFooter>
@@ -273,7 +311,10 @@ function EditThresholdDialog({ threshold }: { threshold: ThresholdRow }) {
                 size="icon"
                 className="h-8 w-8"
                 onClick={() => {
-                    setData({ threshold_value: String(threshold.threshold_value), is_active: threshold.is_active });
+                    setData({
+                        threshold_value: String(threshold.threshold_value),
+                        is_active: threshold.is_active,
+                    });
                     setOpen(true);
                 }}
             >
@@ -281,19 +322,34 @@ function EditThresholdDialog({ threshold }: { threshold: ThresholdRow }) {
                 <span className="sr-only">Edit threshold</span>
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
                         <DialogTitle>Edit Threshold</DialogTitle>
                         <DialogDescription>
                             Update the threshold value for{' '}
                             <strong>{threshold.alert_type_label}</strong>
-                            {threshold.device_name && ` — ${threshold.device_name}`}
-                            {threshold.unit_type && ` — ${threshold.unit_type}`}.
+                            {threshold.device_name &&
+                                ` — ${threshold.device_name}`}
+                            {threshold.unit_type && ` — ${threshold.unit_type}`}
+                            .
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form id={`edit-threshold-form-${threshold.id}`} onSubmit={handleSubmit} className="py-2">
+                    <form
+                        id={`edit-threshold-form-${threshold.id}`}
+                        onSubmit={handleSubmit}
+                        className="py-2"
+                    >
                         <div className="space-y-4">
                             <div className="grid gap-2">
                                 <Label htmlFor={`value-${threshold.id}`}>
@@ -310,7 +366,12 @@ function EditThresholdDialog({ threshold }: { threshold: ThresholdRow }) {
                                     step="0.01"
                                     min="0"
                                     value={data.threshold_value}
-                                    onChange={(e) => setData('threshold_value', e.target.value)}
+                                    onChange={(e) =>
+                                        setData(
+                                            'threshold_value',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
                                 <InputError message={errors.threshold_value} />
                             </div>
@@ -319,18 +380,30 @@ function EditThresholdDialog({ threshold }: { threshold: ThresholdRow }) {
                                 <Checkbox
                                     id={`active-${threshold.id}`}
                                     checked={data.is_active}
-                                    onCheckedChange={(v) => setData('is_active', Boolean(v))}
+                                    onCheckedChange={(v) =>
+                                        setData('is_active', Boolean(v))
+                                    }
                                 />
-                                <Label htmlFor={`active-${threshold.id}`}>Active</Label>
+                                <Label htmlFor={`active-${threshold.id}`}>
+                                    Active
+                                </Label>
                             </div>
                         </div>
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" form={`edit-threshold-form-${threshold.id}`} disabled={processing}>
+                        <Button
+                            type="submit"
+                            form={`edit-threshold-form-${threshold.id}`}
+                            disabled={processing}
+                        >
                             Save Changes
                         </Button>
                     </DialogFooter>
@@ -362,21 +435,30 @@ function DeleteThresholdDialog({ threshold }: { threshold: ThresholdRow }) {
                         <DialogTitle>Delete Threshold</DialogTitle>
                         <DialogDescription>
                             Are you sure you want to delete the{' '}
-                            <strong>{threshold.alert_type_label}</strong> threshold? This action cannot be undone.
+                            <strong>{threshold.alert_type_label}</strong>{' '}
+                            threshold? This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
                         <Button
                             variant="destructive"
                             disabled={processing}
                             onClick={() =>
-                                destroy(AlertThresholdController.destroy.url(threshold.id), {
-                                    preserveScroll: true,
-                                    onSuccess: () => setOpen(false),
-                                })
+                                destroy(
+                                    AlertThresholdController.destroy.url(
+                                        threshold.id,
+                                    ),
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: () => setOpen(false),
+                                    },
+                                )
                             }
                         >
                             Delete
@@ -388,7 +470,12 @@ function DeleteThresholdDialog({ threshold }: { threshold: ThresholdRow }) {
     );
 }
 
-export default function AlertThresholdsIndex({ thresholds, devices, alertTypes, unitTypes }: PageProps) {
+export default function AlertThresholdsIndex({
+    thresholds,
+    devices,
+    alertTypes,
+    unitTypes,
+}: PageProps) {
     return (
         <>
             <Head title="Alert Thresholds" />
@@ -396,12 +483,19 @@ export default function AlertThresholdsIndex({ thresholds, devices, alertTypes, 
             <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Alert Thresholds</h1>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Alert Thresholds
+                        </h1>
                         <p className="text-sm text-muted-foreground">
-                            Configure trigger values for overspeed, offline, and low signal alerts.
+                            Configure trigger values for overspeed, offline, and
+                            low signal alerts.
                         </p>
                     </div>
-                    <CreateThresholdDialog alertTypes={alertTypes} devices={devices} unitTypes={unitTypes} />
+                    <CreateThresholdDialog
+                        alertTypes={alertTypes}
+                        devices={devices}
+                        unitTypes={unitTypes}
+                    />
                 </div>
 
                 <div className="rounded-md border">
@@ -420,50 +514,76 @@ export default function AlertThresholdsIndex({ thresholds, devices, alertTypes, 
                             {thresholds.length ? (
                                 thresholds.map((t) => (
                                     <TableRow key={t.id}>
-                                        <TableCell className="font-medium">{t.alert_type_label}</TableCell>
+                                        <TableCell className="font-medium">
+                                            {t.alert_type_label}
+                                        </TableCell>
                                         <TableCell>
-                                            <Badge variant="outline" className={SCOPE_BADGE[t.scope]}>
+                                            <Badge
+                                                variant="outline"
+                                                className={SCOPE_BADGE[t.scope]}
+                                            >
                                                 {SCOPE_LABEL[t.scope]}
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
                                             {t.scope === 'device' && (
                                                 <div>
-                                                    <div>{t.device_name ?? '—'}</div>
-                                                    <div className="font-mono text-xs text-muted-foreground">{t.dev_eui}</div>
+                                                    <div>
+                                                        {t.device_name ?? '—'}
+                                                    </div>
+                                                    <div className="font-mono text-xs text-muted-foreground">
+                                                        {t.dev_eui}
+                                                    </div>
                                                 </div>
                                             )}
                                             {t.scope === 'unit_type' && (
-                                                <span className="text-sm">{t.unit_type}</span>
+                                                <span className="text-sm">
+                                                    {t.unit_type}
+                                                </span>
                                             )}
                                             {t.scope === 'global' && (
-                                                <span className="text-sm text-muted-foreground">All devices</span>
+                                                <span className="text-sm text-muted-foreground">
+                                                    All devices
+                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell className="tabular-nums">
                                             {t.threshold_value}
                                             {t.threshold_unit && (
-                                                <span className="ml-1 text-muted-foreground">{t.threshold_unit}</span>
+                                                <span className="ml-1 text-muted-foreground">
+                                                    {t.threshold_unit}
+                                                </span>
                                             )}
                                         </TableCell>
                                         <TableCell>
                                             {t.is_active ? (
-                                                <Badge variant="online">Active</Badge>
+                                                <Badge variant="online">
+                                                    Active
+                                                </Badge>
                                             ) : (
-                                                <Badge variant="offline">Inactive</Badge>
+                                                <Badge variant="offline">
+                                                    Inactive
+                                                </Badge>
                                             )}
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center justify-end gap-1">
-                                                <EditThresholdDialog threshold={t} />
-                                                <DeleteThresholdDialog threshold={t} />
+                                                <EditThresholdDialog
+                                                    threshold={t}
+                                                />
+                                                <DeleteThresholdDialog
+                                                    threshold={t}
+                                                />
                                             </div>
                                         </TableCell>
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                                    <TableCell
+                                        colSpan={6}
+                                        className="h-24 text-center text-muted-foreground"
+                                    >
                                         No thresholds configured.
                                     </TableCell>
                                 </TableRow>
@@ -473,7 +593,8 @@ export default function AlertThresholdsIndex({ thresholds, devices, alertTypes, 
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                    Priority order: Device-specific &gt; Unit Type &gt; Global. The most specific threshold applies.
+                    Priority order: Device-specific &gt; Unit Type &gt; Global.
+                    The most specific threshold applies.
                 </p>
             </div>
         </>

@@ -1,13 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
 import {
-    type ColumnDef,
     flexRender,
     getCoreRowModel,
     getPaginationRowModel,
     getSortedRowModel,
-    type SortingState,
     useReactTable,
 } from '@tanstack/react-table';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { ArrowLeft, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
 import { Badge, StatusBadge } from '@/components/ui/badge';
@@ -21,7 +20,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { UNIT_CATEGORIES, type UnitCategory } from '@/config/unit-types';
+import { UNIT_CATEGORIES } from '@/config/unit-types';
+import type { UnitCategory } from '@/config/unit-types';
 import { index as adminDevicesIndex } from '@/routes/admin/devices';
 
 type AdminDevice = {
@@ -66,7 +66,9 @@ function DeviceInfoCard({ device }: { device: AdminDevice }) {
                 <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
                     <div>
                         <dt className="text-muted-foreground">Device EUI</dt>
-                        <dd className="font-mono font-medium">{device.dev_eui}</dd>
+                        <dd className="font-mono font-medium">
+                            {device.dev_eui}
+                        </dd>
                     </div>
                     {device.join_eui && (
                         <div>
@@ -75,7 +77,9 @@ function DeviceInfoCard({ device }: { device: AdminDevice }) {
                         </div>
                     )}
                     <div>
-                        <dt className="text-muted-foreground">Application ID</dt>
+                        <dt className="text-muted-foreground">
+                            Application ID
+                        </dt>
                         <dd>{device.application_id}</dd>
                     </div>
                     <div>
@@ -87,7 +91,9 @@ function DeviceInfoCard({ device }: { device: AdminDevice }) {
                             >
                                 {cat.abbr}
                             </span>{' '}
-                            <span className="text-muted-foreground">{cat.label}</span>
+                            <span className="text-muted-foreground">
+                                {cat.label}
+                            </span>
                         </dd>
                     </div>
                     {device.unit_model && (
@@ -105,7 +111,11 @@ function DeviceInfoCard({ device }: { device: AdminDevice }) {
                     <div>
                         <dt className="text-muted-foreground">Active</dt>
                         <dd>
-                            <Badge variant={device.is_active ? 'online' : 'offline'}>
+                            <Badge
+                                variant={
+                                    device.is_active ? 'online' : 'offline'
+                                }
+                            >
                                 {device.is_active ? 'Yes' : 'No'}
                             </Badge>
                         </dd>
@@ -130,14 +140,18 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
                 <Button
                     variant="ghost"
                     className="-ml-3 h-8"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
                 >
                     Time
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
             ),
             cell: ({ row }) => (
-                <span className="text-sm tabular-nums">{row.original.recorded_at ?? '—'}</span>
+                <span className="text-sm tabular-nums">
+                    {row.original.recorded_at ?? '—'}
+                </span>
             ),
         },
         {
@@ -145,7 +159,11 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
             header: 'Coordinates',
             cell: ({ row }) => {
                 const { latitude: lat, longitude: lng } = row.original;
-                if (lat == null || lng == null) return <span className="text-muted-foreground">—</span>;
+
+                if (lat == null || lng == null) {
+                    return <span className="text-muted-foreground">—</span>;
+                }
+
                 return (
                     <span className="font-mono text-xs tabular-nums">
                         {lat.toFixed(6)}, {lng.toFixed(6)}
@@ -159,7 +177,9 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
                 <Button
                     variant="ghost"
                     className="-ml-3 h-8"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
                 >
                     Speed
                     <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -167,6 +187,7 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
             ),
             cell: ({ row }) => {
                 const v = row.original.speed_kmh;
+
                 return (
                     <span className="tabular-nums">
                         {v != null ? `${v.toFixed(1)} km/h` : '—'}
@@ -179,7 +200,12 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
             header: 'Heading',
             cell: ({ row }) => {
                 const v = row.original.heading_deg;
-                return <span className="tabular-nums">{v != null ? `${v.toFixed(0)}°` : '—'}</span>;
+
+                return (
+                    <span className="tabular-nums">
+                        {v != null ? `${v.toFixed(0)}°` : '—'}
+                    </span>
+                );
             },
         },
         {
@@ -188,7 +214,9 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
                 <Button
                     variant="ghost"
                     className="-ml-3 h-8"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
                 >
                     RSSI
                     <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -196,7 +224,12 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
             ),
             cell: ({ row }) => {
                 const v = row.original.rssi;
-                return <span className="tabular-nums">{v != null ? `${v} dBm` : '—'}</span>;
+
+                return (
+                    <span className="tabular-nums">
+                        {v != null ? `${v} dBm` : '—'}
+                    </span>
+                );
             },
         },
         {
@@ -204,14 +237,21 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
             header: 'SNR',
             cell: ({ row }) => {
                 const v = row.original.snr;
-                return <span className="tabular-nums">{v != null ? `${v.toFixed(1)} dB` : '—'}</span>;
+
+                return (
+                    <span className="tabular-nums">
+                        {v != null ? `${v.toFixed(1)} dB` : '—'}
+                    </span>
+                );
             },
         },
         {
             accessorKey: 'satellites',
             header: 'Sats',
             cell: ({ row }) => (
-                <span className="tabular-nums">{row.original.satellites ?? '—'}</span>
+                <span className="tabular-nums">
+                    {row.original.satellites ?? '—'}
+                </span>
             ),
         },
         {
@@ -219,7 +259,12 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
             header: 'HDOP',
             cell: ({ row }) => {
                 const v = row.original.hdop;
-                return <span className="tabular-nums">{v != null ? v.toFixed(2) : '—'}</span>;
+
+                return (
+                    <span className="tabular-nums">
+                        {v != null ? v.toFixed(2) : '—'}
+                    </span>
+                );
             },
         },
     ];
@@ -255,7 +300,11 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
                                         <TableHead key={header.id}>
                                             {header.isPlaceholder
                                                 ? null
-                                                : flexRender(header.column.columnDef.header, header.getContext())}
+                                                : flexRender(
+                                                      header.column.columnDef
+                                                          .header,
+                                                      header.getContext(),
+                                                  )}
                                         </TableHead>
                                     ))}
                                 </TableRow>
@@ -267,14 +316,20 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
                                     <TableRow key={i}>
                                         {row.getVisibleCells().map((cell) => (
                                             <TableCell key={cell.id}>
-                                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                {flexRender(
+                                                    cell.column.columnDef.cell,
+                                                    cell.getContext(),
+                                                )}
                                             </TableCell>
                                         ))}
                                     </TableRow>
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                    <TableCell
+                                        colSpan={columns.length}
+                                        className="h-24 text-center text-muted-foreground"
+                                    >
                                         No GPS records found.
                                     </TableCell>
                                 </TableRow>
@@ -286,13 +341,24 @@ function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
                 <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
                     <span>{gpsLogs.length} record(s) total</span>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => table.previousPage()}
+                            disabled={!table.getCanPreviousPage()}
+                        >
                             Previous
                         </Button>
                         <span>
-                            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                            Page {table.getState().pagination.pageIndex + 1} of{' '}
+                            {table.getPageCount()}
                         </span>
-                        <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => table.nextPage()}
+                            disabled={!table.getCanNextPage()}
+                        >
                             Next
                         </Button>
                     </div>
@@ -312,12 +378,18 @@ export default function DeviceShow({ device, gpsLogs }: PageProps) {
                     <Button variant="ghost" size="icon" asChild>
                         <Link href={adminDevicesIndex()}>
                             <ArrowLeft className="h-4 w-4" />
-                            <span className="sr-only">Back to Device Management</span>
+                            <span className="sr-only">
+                                Back to Device Management
+                            </span>
                         </Link>
                     </Button>
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">{device.device_name}</h1>
-                        <p className="font-mono text-sm text-muted-foreground">{device.dev_eui}</p>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            {device.device_name}
+                        </h1>
+                        <p className="font-mono text-sm text-muted-foreground">
+                            {device.dev_eui}
+                        </p>
                     </div>
                 </div>
 

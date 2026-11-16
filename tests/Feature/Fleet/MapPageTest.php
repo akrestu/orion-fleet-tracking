@@ -22,7 +22,7 @@ describe('Fleet Map page', function () {
     });
 
     it('passes initialPositions prop to page', function () {
-        $user = User::factory()->create();
+        $user = User::factory()->admin()->create();
         $device = Device::factory()->create(['dev_eui' => '9956efb31332a835', 'is_active' => true]);
 
         GpsLog::create([

@@ -1,22 +1,23 @@
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
-    type ColumnDef,
     flexRender,
     getCoreRowModel,
     getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
-    type SortingState,
     useReactTable,
 } from '@tanstack/react-table';
+import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { ArrowUpDown, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import DeviceController from '@/actions/App/Http/Controllers/Admin/DeviceController';
 import InputError from '@/components/input-error';
-import { Badge, type BadgeVariant, StatusBadge } from '@/components/ui/badge';
+import { Badge, StatusBadge } from '@/components/ui/badge';
+import type { BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox } from '@/components/ui/combobox';
+import type { ComboboxOption } from '@/components/ui/combobox';
 import {
     Dialog,
     DialogContent,
@@ -28,6 +29,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
     Table,
     TableBody,
     TableCell,
@@ -35,15 +43,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { UNIT_CATEGORIES, type UnitCategory } from '@/config/unit-types';
-import adminDevices, { index as adminDevicesIndex } from '@/routes/admin/devices';
+import { UNIT_CATEGORIES } from '@/config/unit-types';
+import type { UnitCategory } from '@/config/unit-types';
+import adminDevices, {
+    index as adminDevicesIndex,
+} from '@/routes/admin/devices';
 
 type DeviceGroupRef = {
     id: number;
@@ -91,8 +95,8 @@ const OPERATIONAL_STATUS_VARIANT: Record<OperationalStatus, BadgeVariant> = {
 
 const OPERATIONAL_STATUS_LABEL: Record<OperationalStatus, string> = {
     operational: 'Operational',
-    standby:     'Standby',
-    breakdown:   'Breakdown',
+    standby: 'Standby',
+    breakdown: 'Breakdown',
 };
 
 // ── Shared form fields ───────────────────────────────────────────────────────
@@ -120,7 +124,9 @@ function DeviceFormFields({
     showDevEui: boolean;
     groups: DeviceGroupRef[];
 }) {
-    const unitTypeOptions: ComboboxOption[] = Object.entries(UNIT_CATEGORIES).map(([key, meta]) => ({
+    const unitTypeOptions: ComboboxOption[] = Object.entries(
+        UNIT_CATEGORIES,
+    ).map(([key, meta]) => ({
         value: key,
         label: meta.label,
         prefix: (
@@ -134,7 +140,10 @@ function DeviceFormFields({
     const selectedCat = UNIT_CATEGORIES[values.unit_type as UnitCategory];
     const models = selectedCat?.models ?? [];
 
-    const unitModelOptions: ComboboxOption[] = models.map((m) => ({ value: m, label: m }));
+    const unitModelOptions: ComboboxOption[] = models.map((m) => ({
+        value: m,
+        label: m,
+    }));
 
     const groupOptions: ComboboxOption[] = [
         { value: '__none__', label: '— No group —' },
@@ -179,7 +188,10 @@ function DeviceFormFields({
 
             <div className="grid gap-2">
                 <Label htmlFor="join_eui">
-                    Join EUI <span className="text-muted-foreground font-normal">(optional)</span>
+                    Join EUI{' '}
+                    <span className="font-normal text-muted-foreground">
+                        (optional)
+                    </span>
                 </Label>
                 <Input
                     id="join_eui"
@@ -231,7 +243,10 @@ function DeviceFormFields({
 
             <div className="grid gap-2">
                 <Label>
-                    Model <span className="text-muted-foreground font-normal">(optional)</span>
+                    Model{' '}
+                    <span className="font-normal text-muted-foreground">
+                        (optional)
+                    </span>
                 </Label>
                 {models.length > 0 ? (
                     <>
@@ -245,7 +260,9 @@ function DeviceFormFields({
                         />
                         <Input
                             value={values.unit_model}
-                            onChange={(e) => onChange('unit_model', e.target.value)}
+                            onChange={(e) =>
+                                onChange('unit_model', e.target.value)
+                            }
                             placeholder="Or type custom model name..."
                             autoComplete="off"
                         />
@@ -265,14 +282,19 @@ function DeviceFormFields({
                 <Checkbox
                     id="is_active"
                     checked={values.is_active}
-                    onCheckedChange={(checked) => onChange('is_active', Boolean(checked))}
+                    onCheckedChange={(checked) =>
+                        onChange('is_active', Boolean(checked))
+                    }
                 />
                 <Label htmlFor="is_active">Active</Label>
             </div>
 
             <div className="grid gap-2">
                 <Label>Operational Status</Label>
-                <Select value={values.operational_status} onValueChange={(v) => onChange('operational_status', v)}>
+                <Select
+                    value={values.operational_status}
+                    onValueChange={(v) => onChange('operational_status', v)}
+                >
                     <SelectTrigger>
                         <SelectValue />
                     </SelectTrigger>
@@ -283,8 +305,9 @@ function DeviceFormFields({
                     </SelectContent>
                 </Select>
                 <InputError message={errors.operational_status} />
-                <p className="text-muted-foreground text-xs">
-                    Standby & Breakdown otomatis dikecualikan dari laporan Fleet Utilization.
+                <p className="text-xs text-muted-foreground">
+                    Standby & Breakdown otomatis dikecualikan dari laporan Fleet
+                    Utilization.
                 </p>
             </div>
 
@@ -340,28 +363,56 @@ function CreateDeviceDialog({ groups }: { groups: DeviceGroupRef[] }) {
                 Add Device
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Add Device</DialogTitle>
-                        <DialogDescription>Register a new device in the system.</DialogDescription>
+                        <DialogDescription>
+                            Register a new device in the system.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form id="create-device-form" onSubmit={handleSubmit} className="py-2">
+                    <form
+                        id="create-device-form"
+                        onSubmit={handleSubmit}
+                        className="py-2"
+                    >
                         <DeviceFormFields
                             errors={errors}
                             values={data}
-                            onChange={(field, value) => setData(field as keyof typeof data, value as never)}
+                            onChange={(field, value) =>
+                                setData(
+                                    field as keyof typeof data,
+                                    value as never,
+                                )
+                            }
                             showDevEui
                             groups={groups}
                         />
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" form="create-device-form" disabled={processing}>
+                        <Button
+                            type="submit"
+                            form="create-device-form"
+                            disabled={processing}
+                        >
                             Add Device
                         </Button>
                     </DialogFooter>
@@ -371,7 +422,13 @@ function CreateDeviceDialog({ groups }: { groups: DeviceGroupRef[] }) {
     );
 }
 
-function EditDeviceDialog({ device, groups }: { device: AdminDevice; groups: DeviceGroupRef[] }) {
+function EditDeviceDialog({
+    device,
+    groups,
+}: {
+    device: AdminDevice;
+    groups: DeviceGroupRef[];
+}) {
     const [open, setOpen] = useState(false);
 
     const { data, setData, put, processing, errors, reset } = useForm({
@@ -408,7 +465,9 @@ function EditDeviceDialog({ device, groups }: { device: AdminDevice; groups: Dev
                         unit_model: device.unit_model ?? '',
                         is_active: device.is_active,
                         operational_status: device.operational_status,
-                        device_group_id: device.device_group_id as number | null,
+                        device_group_id: device.device_group_id as
+                            | number
+                            | null,
                     });
                     setOpen(true);
                 }}
@@ -417,31 +476,59 @@ function EditDeviceDialog({ device, groups }: { device: AdminDevice; groups: Dev
                 <span className="sr-only">Edit {device.device_name}</span>
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Edit Device</DialogTitle>
                         <DialogDescription>
                             Update {device.device_name}{' '}
-                            <span className="font-mono text-xs">({device.dev_eui})</span>
+                            <span className="font-mono text-xs">
+                                ({device.dev_eui})
+                            </span>
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form id={`edit-device-form-${device.id}`} onSubmit={handleSubmit} className="py-2">
+                    <form
+                        id={`edit-device-form-${device.id}`}
+                        onSubmit={handleSubmit}
+                        className="py-2"
+                    >
                         <DeviceFormFields
                             errors={errors}
                             values={data}
-                            onChange={(field, value) => setData(field as keyof typeof data, value as never)}
+                            onChange={(field, value) =>
+                                setData(
+                                    field as keyof typeof data,
+                                    value as never,
+                                )
+                            }
                             showDevEui={false}
                             groups={groups}
                         />
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" type="button" onClick={() => setOpen(false)}>
+                        <Button
+                            variant="outline"
+                            type="button"
+                            onClick={() => setOpen(false)}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" form={`edit-device-form-${device.id}`} disabled={processing}>
+                        <Button
+                            type="submit"
+                            form={`edit-device-form-${device.id}`}
+                            disabled={processing}
+                        >
                             Save Changes
                         </Button>
                     </DialogFooter>
@@ -479,13 +566,23 @@ function DeleteDeviceDialog({ device }: { device: AdminDevice }) {
                     <DialogHeader>
                         <DialogTitle>Delete Device</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to delete <strong>{device.device_name}</strong>? This action cannot
-                            be undone.
+                            Are you sure you want to delete{' '}
+                            <strong>{device.device_name}</strong>? This action
+                            cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button variant="destructive" onClick={handleDelete} disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDelete}
+                            disabled={processing}
+                        >
                             Delete
                         </Button>
                     </DialogFooter>
@@ -508,7 +605,9 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                 <Button
                     variant="ghost"
                     className="-ml-3 h-8"
-                    onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
                 >
                     Name
                     <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -519,14 +618,19 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             accessorKey: 'dev_eui',
             header: 'Device EUI',
             cell: ({ row }) => (
-                <span className="font-mono text-xs">{row.original.dev_eui}</span>
+                <span className="font-mono text-xs">
+                    {row.original.dev_eui}
+                </span>
             ),
         },
         {
             accessorKey: 'unit_type',
             header: 'Category',
             cell: ({ row }) => {
-                const cat = UNIT_CATEGORIES[row.original.unit_type] ?? UNIT_CATEGORIES.other;
+                const cat =
+                    UNIT_CATEGORIES[row.original.unit_type] ??
+                    UNIT_CATEGORIES.other;
+
                 return (
                     <span
                         className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-bold text-white"
@@ -556,6 +660,7 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             header: 'Kondisi',
             cell: ({ row }) => {
                 const os = row.original.operational_status;
+
                 return (
                     <Badge variant={OPERATIONAL_STATUS_VARIANT[os]}>
                         {OPERATIONAL_STATUS_LABEL[os]}
@@ -578,10 +683,19 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             header: 'Group',
             cell: ({ row }) => {
                 const g = row.original.device_group;
-                if (!g) return <span className="text-muted-foreground text-xs">—</span>;
+
+                if (!g) {
+                    return (
+                        <span className="text-xs text-muted-foreground">—</span>
+                    );
+                }
+
                 return (
                     <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: g.color }} />
+                        <span
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ backgroundColor: g.color }}
+                        />
                         {g.name}
                     </span>
                 );
@@ -591,7 +705,9 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             accessorKey: 'last_seen_at',
             header: 'Last Seen',
             cell: ({ row }) => (
-                <span className="text-muted-foreground text-sm">{row.original.last_seen_at ?? '—'}</span>
+                <span className="text-sm text-muted-foreground">
+                    {row.original.last_seen_at ?? '—'}
+                </span>
             ),
         },
         {
@@ -599,10 +715,17 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             header: '',
             cell: ({ row }) => (
                 <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        asChild
+                    >
                         <Link href={adminDevices.show.url(row.original.id)}>
                             <Eye className="h-4 w-4" />
-                            <span className="sr-only">View {row.original.device_name}</span>
+                            <span className="sr-only">
+                                View {row.original.device_name}
+                            </span>
                         </Link>
                     </Button>
                     <EditDeviceDialog device={row.original} groups={groups} />
@@ -632,8 +755,12 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">Device Management</h1>
-                        <p className="text-sm text-muted-foreground">Manage registered tracking devices.</p>
+                        <h1 className="text-xl font-semibold tracking-tight">
+                            Device Management
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Manage registered tracking devices.
+                        </p>
                     </div>
                     <CreateDeviceDialog groups={groups} />
                 </div>
@@ -655,7 +782,11 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                                             <TableHead key={header.id}>
                                                 {header.isPlaceholder
                                                     ? null
-                                                    : flexRender(header.column.columnDef.header, header.getContext())}
+                                                    : flexRender(
+                                                          header.column
+                                                              .columnDef.header,
+                                                          header.getContext(),
+                                                      )}
                                             </TableHead>
                                         ))}
                                     </TableRow>
@@ -665,11 +796,17 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                                 {table.getRowModel().rows.length ? (
                                     table.getRowModel().rows.map((row) => (
                                         <TableRow key={row.id}>
-                                            {row.getVisibleCells().map((cell) => (
-                                                <TableCell key={cell.id}>
-                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                                                </TableCell>
-                                            ))}
+                                            {row
+                                                .getVisibleCells()
+                                                .map((cell) => (
+                                                    <TableCell key={cell.id}>
+                                                        {flexRender(
+                                                            cell.column
+                                                                .columnDef.cell,
+                                                            cell.getContext(),
+                                                        )}
+                                                    </TableCell>
+                                                ))}
                                         </TableRow>
                                     ))
                                 ) : (
@@ -687,7 +824,10 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                     </div>
 
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{table.getFilteredRowModel().rows.length} device(s) total</span>
+                        <span>
+                            {table.getFilteredRowModel().rows.length} device(s)
+                            total
+                        </span>
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"
@@ -698,7 +838,8 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                                 Previous
                             </Button>
                             <span>
-                                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                                Page {table.getState().pagination.pageIndex + 1}{' '}
+                                of {table.getPageCount()}
                             </span>
                             <Button
                                 variant="outline"

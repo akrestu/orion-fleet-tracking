@@ -10,22 +10,24 @@ const TIME_RANGE_MINUTES: Record<TimeRange, number> = {
     '24h': 1440,
 };
 
+type RouteResult = {
+    key: string;
+    points: GpsLogPoint[];
+};
+
 export function useRouteHistory(devEui: string | null, timeRange: TimeRange) {
-    const [points, setPoints] = useState<GpsLogPoint[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState<RouteResult | null>(null);
     const abortRef = useRef<AbortController | null>(null);
+    const requestKey = devEui ? `${devEui}:${timeRange}` : null;
 
     useEffect(() => {
-        if (!devEui) {
-            setPoints([]);
+        if (!devEui || !requestKey) {
             return;
         }
 
         abortRef.current?.abort();
         const controller = new AbortController();
         abortRef.current = controller;
-
-        setLoading(true);
 
         const from = new Date(Date.now() - TIME_RANGE_MINUTES[timeRange] * 60 * 1000).toISOString();
         const url = `/api/fleet/devices/${encodeURIComponent(devEui)}/history?from=${encodeURIComponent(from)}&limit=5000`;
@@ -35,17 +37,26 @@ export function useRouteHistory(devEui: string | null, timeRange: TimeRange) {
             .then((json) => {
                 const data: GpsLogPoint[] = (json.data ?? json) as GpsLogPoint[];
                 // sort ascending so polyline draws oldest → newest
-                setPoints(data.slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at)));
+                setResult({
+                    key: requestKey,
+                    points: data.slice().sort((a, b) => a.recorded_at.localeCompare(b.recorded_at)),
+                });
             })
             .catch(() => {
-                // aborted or network error — ignore
-            })
-            .finally(() => {
-                setLoading(false);
+                if (!controller.signal.aborted) {
+                    // network error — settle with an empty route so loading ends
+                    setResult({ key: requestKey, points: [] });
+                }
             });
 
         return () => controller.abort();
-    }, [devEui, timeRange]);
+    }, [devEui, timeRange, requestKey]);
 
-    return { points, loading };
+    // Loading and points are derived from the last settled request, avoiding synchronous setState in the effect.
+    const isCurrent = requestKey !== null && result?.key === requestKey;
+
+    return {
+        points: isCurrent ? result.points : [],
+        loading: requestKey !== null && !isCurrent,
+    };
 }

@@ -8,29 +8,15 @@ use App\Models\ApiToken;
 use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class ApiTokenController extends Controller
 {
-    public function index(): Response
+    /**
+     * API tokens are managed on the system settings page.
+     */
+    public function index(): RedirectResponse
     {
-        $tokens = ApiToken::with('creator:id,name')
-            ->orderByDesc('created_at')
-            ->get(['id', 'name', 'token_prefix', 'abilities', 'last_used_at', 'expires_at', 'created_by', 'created_at']);
-
-        return Inertia::render('admin/system-settings/index', [
-            'apiTokens' => $tokens->map(fn (ApiToken $t) => [
-                'id' => $t->id,
-                'name' => $t->name,
-                'token_preview' => ($t->token_prefix ?? '????????').'...',
-                'abilities' => $t->abilities ?? [],
-                'last_used_at' => $t->last_used_at?->diffForHumans(),
-                'expires_at' => $t->expires_at?->toDateString(),
-                'created_by' => $t->creator?->name,
-                'created_at' => $t->created_at->diffForHumans(),
-            ]),
-        ]);
+        return to_route('admin.system-settings.index');
     }
 
     public function store(CreateApiTokenRequest $request): RedirectResponse
@@ -41,7 +27,8 @@ class ApiTokenController extends Controller
             'name' => $request->validated('name'),
             'token' => hash('sha256', $plaintext),
             'token_prefix' => substr($plaintext, 0, 8),
-            'abilities' => $request->validated('abilities', []),
+            'abilities' => $request->validated('abilities') ?: ['fleet.read'],
+            'device_group_ids' => $request->validated('device_group_ids') ?: null,
             'expires_at' => $request->validated('expires_at'),
             'created_by' => auth()->id(),
         ]);

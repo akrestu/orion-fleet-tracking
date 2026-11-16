@@ -86,3 +86,49 @@ test('admins can delete a tileset', function () {
 
     $this->assertDatabaseMissing('map_tilesets', ['id' => $tileset->id]);
 });
+
+/**
+ * Builds a temporary ZIP upload containing the given entries.
+ *
+ * @param  array<string, string>  $entries
+ */
+function makeTileZip(array $entries): UploadedFile
+{
+    $tmpZip = tempnam(sys_get_temp_dir(), 'tiles').'.zip';
+    $zip = new ZipArchive;
+    $zip->open($tmpZip, ZipArchive::CREATE);
+
+    foreach ($entries as $name => $contents) {
+        $zip->addFromString($name, $contents);
+    }
+
+    $zip->close();
+
+    return new UploadedFile($tmpZip, 'tiles.zip', 'application/zip', UPLOAD_ERR_OK, true);
+}
+
+test('upload rejects archives containing non-image files', function (string $entry) {
+    Storage::fake('public');
+    $admin = User::factory()->create(['role' => UserRole::Admin]);
+
+    $this->actingAs($admin)
+        ->postJson(route('fleet.map.tiles.store'), [
+            'name' => 'Bad Tiles',
+            'tiles' => makeTileZip(['14/10/1.png' => 'png', $entry => 'payload']),
+        ])
+        ->assertUnprocessable();
+
+    $this->assertDatabaseMissing('map_tilesets', ['name' => 'Bad Tiles']);
+})->with(['shell.php', '14/index.html', 'evil.svg', 'tiles/.htaccess']);
+
+test('upload rejects archives with path traversal entries', function () {
+    Storage::fake('public');
+    $admin = User::factory()->create(['role' => UserRole::Admin]);
+
+    $this->actingAs($admin)
+        ->postJson(route('fleet.map.tiles.store'), [
+            'name' => 'Traversal',
+            'tiles' => makeTileZip(['14/../../escape.png' => 'png']),
+        ])
+        ->assertUnprocessable();
+});

@@ -12,6 +12,15 @@ use ZipArchive;
 
 class MapTileController extends Controller
 {
+    /** Only image tiles may be extracted into the publicly served storage directory. */
+    private const ALLOWED_TILE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp'];
+
+    /** Upper bound on archive entries to stop pathological archives. */
+    private const MAX_ENTRIES = 200_000;
+
+    /** Upper bound on total uncompressed size (2 GB) to guard against zip bombs. */
+    private const MAX_UNCOMPRESSED_BYTES = 2 * 1024 * 1024 * 1024;
+
     public function index(): JsonResponse
     {
         $tilesets = MapTileset::orderBy('name')->get()->map(fn (MapTileset $t) => [
@@ -41,24 +50,12 @@ class MapTileController extends Controller
             return response()->json(['message' => 'File ZIP tidak valid.'], 422);
         }
 
-        // Guard against Zip Slip: reject any entry that contains path traversal sequences
-        // or is an absolute path. We check the raw entry name before extraction because
-        // realpath() returns false for paths that do not exist yet.
-        for ($i = 0; $i < $zip->count(); $i++) {
-            $entry = $zip->getNameIndex($i);
+        $rejection = $this->validateArchiveEntries($zip);
 
-            // Normalise to forward slashes for consistent checking.
-            $normalised = str_replace('\\', '/', $entry);
+        if ($rejection !== null) {
+            $zip->close();
 
-            if (
-                str_contains($normalised, '../') ||
-                str_starts_with($normalised, '/') ||
-                (strlen($normalised) >= 2 && $normalised[1] === ':')  // Windows drive letter
-            ) {
-                $zip->close();
-
-                return response()->json(['message' => 'ZIP berisi path yang tidak diizinkan.'], 422);
-            }
+            return response()->json(['message' => $rejection], 422);
         }
 
         $zip->extractTo($destPath);
@@ -90,5 +87,56 @@ class MapTileController extends Controller
         $tileset->delete();
 
         return response()->json(null, 204);
+    }
+
+    /**
+     * Returns a rejection message when the archive is unsafe, or null when it may be extracted.
+     * Guards against Zip Slip (path traversal / absolute paths), non-image payloads
+     * (e.g. .php or .html served from public storage) and zip bombs.
+     */
+    private function validateArchiveEntries(ZipArchive $zip): ?string
+    {
+        if ($zip->count() > self::MAX_ENTRIES) {
+            return 'ZIP berisi terlalu banyak file.';
+        }
+
+        $totalBytes = 0;
+
+        for ($i = 0; $i < $zip->count(); $i++) {
+            $stat = $zip->statIndex($i);
+
+            if ($stat === false) {
+                return 'ZIP tidak dapat dibaca.';
+            }
+
+            $normalised = str_replace('\\', '/', $stat['name']);
+            $segments = explode('/', $normalised);
+
+            if (
+                in_array('..', $segments, true) ||
+                str_starts_with($normalised, '/') ||
+                (strlen($normalised) >= 2 && $normalised[1] === ':')
+            ) {
+                return 'ZIP berisi path yang tidak diizinkan.';
+            }
+
+            if (str_ends_with($normalised, '/')) {
+                continue;
+            }
+
+            $extension = strtolower(pathinfo($normalised, PATHINFO_EXTENSION));
+
+            if (! in_array($extension, self::ALLOWED_TILE_EXTENSIONS, true)) {
+                return 'ZIP hanya boleh berisi file gambar tile (png, jpg, webp).';
+            }
+
+            $totalBytes += $stat['size'];
+
+            if ($totalBytes > self::MAX_UNCOMPRESSED_BYTES) {
+                return 'Ukuran isi ZIP melebihi batas 2 GB.';
+            }
+        }
+
+        return null;
     }
 }

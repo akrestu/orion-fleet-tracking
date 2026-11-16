@@ -24,6 +24,8 @@ class CreateApiTokenRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'abilities' => ['nullable', 'array'],
             'abilities.*' => ['string', 'in:fleet.read,fleet.write,admin.read'],
+            'device_group_ids' => ['nullable', 'array'],
+            'device_group_ids.*' => ['integer', 'exists:device_groups,id'],
             'expires_at' => ['nullable', 'date', 'after:today'],
         ];
     }

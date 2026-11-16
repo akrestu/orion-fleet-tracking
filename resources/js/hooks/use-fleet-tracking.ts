@@ -4,7 +4,7 @@ import type { DevicePosition } from '@/types/fleet';
 
 /**
  * Resolves which private channels carry this user's authorized device updates.
- * `accessibleGroupIds === null` means unrestricted (admin or ungrouped operator).
+ * `accessibleGroupIds === null` means unrestricted (admin only).
  */
 function resolveChannelNames(accessibleGroupIds: number[] | null): string[] {
     if (accessibleGroupIds === null) {

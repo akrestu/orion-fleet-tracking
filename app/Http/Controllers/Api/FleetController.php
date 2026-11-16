@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\FleetHistoryRequest;
 use App\Http\Resources\DevicePositionResource;
 use App\Http\Resources\GpsLogResource;
+use App\Models\ApiToken;
 use App\Models\Device;
 use App\Models\GpsLog;
 use Illuminate\Http\JsonResponse;
@@ -134,7 +135,7 @@ class FleetController extends Controller
     /**
      * Returns accessible device_group_ids for the current request.
      * Session-authenticated users: scoped by their role/groups.
-     * API token requests: unrestricted (null = see everything).
+     * API token requests: scoped to the token's device_group_ids (null = see everything).
      *
      * @return int[]|null
      */
@@ -142,6 +143,13 @@ class FleetController extends Controller
     {
         $user = Auth::user();
 
-        return $user?->accessibleGroupIds();
+        if ($user !== null) {
+            return $user->accessibleGroupIds();
+        }
+
+        /** @var ApiToken|null $token */
+        $token = request()->attributes->get('api_token');
+
+        return $token?->device_group_ids;
     }
 }

@@ -31,7 +31,7 @@ class MqttSubscribeCommand extends Command
 
     public function handle(): int
     {
-        $appId = config('app.chirpstack_app_id', env('CHIRPSTACK_APP_ID'));
+        $appId = config('app.chirpstack_app_id');
         $topic = "application/{$appId}/device/+/event/up";
         $host = config('mqtt-client.connections.default.host');
         $port = config('mqtt-client.connections.default.port');

@@ -15,7 +15,7 @@ export type User = {
 
 export type Auth = {
     user: User;
-    /** null = unrestricted (admin or ungrouped operator); otherwise the list of accessible device_group_ids. */
+    /** null = unrestricted (admin only); otherwise the list of accessible device_group_ids. */
     accessibleGroupIds: number[] | null;
 };
 

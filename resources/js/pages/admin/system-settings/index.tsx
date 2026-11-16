@@ -1,17 +1,26 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
 import {
-    type ColumnDef,
     flexRender,
     getCoreRowModel,
     getPaginationRowModel,
     useReactTable,
 } from '@tanstack/react-table';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Copy, KeyRound, Plus, Server, Shield, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
-import { Badge, type BadgeVariant } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
+import type { BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardFooter,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -50,6 +59,7 @@ type ApiToken = {
     name: string;
     token_preview: string;
     abilities: string[];
+    device_group_ids: number[] | null;
     last_used_at: string | null;
     expires_at: string | null;
     created_by: string | null;
@@ -72,9 +82,15 @@ type AuditLogs = {
     last_page: number;
 };
 
+type DeviceGroupOption = {
+    id: number;
+    name: string;
+};
+
 type PageProps = {
     mqttSettings: MqttSettings;
     apiTokens: ApiToken[];
+    deviceGroups: DeviceGroupOption[];
     auditLogs: AuditLogs;
     flash?: { new_token?: string; success?: string };
 };
@@ -108,7 +124,10 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
         <Card>
             <CardHeader>
                 <CardTitle>MQTT Broker</CardTitle>
-                <CardDescription>Connection settings for the MQTT broker used to receive device telemetry.</CardDescription>
+                <CardDescription>
+                    Connection settings for the MQTT broker used to receive
+                    device telemetry.
+                </CardDescription>
             </CardHeader>
             <form onSubmit={handleSubmit}>
                 <CardContent className="space-y-4">
@@ -117,7 +136,9 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
                         <Input
                             id="mqtt_host"
                             value={data.mqtt_host}
-                            onChange={(e) => setData('mqtt_host', e.target.value)}
+                            onChange={(e) =>
+                                setData('mqtt_host', e.target.value)
+                            }
                             placeholder="e.g. mqtt.example.com"
                             autoComplete="off"
                         />
@@ -132,41 +153,64 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
                             min={1}
                             max={65535}
                             value={data.mqtt_port}
-                            onChange={(e) => setData('mqtt_port', e.target.value)}
+                            onChange={(e) =>
+                                setData('mqtt_port', e.target.value)
+                            }
                             placeholder="1883"
                         />
                         <InputError message={errors.mqtt_port} />
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="mqtt_username">Username <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                        <Label htmlFor="mqtt_username">
+                            Username{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </Label>
                         <Input
                             id="mqtt_username"
                             value={data.mqtt_username}
-                            onChange={(e) => setData('mqtt_username', e.target.value)}
+                            onChange={(e) =>
+                                setData('mqtt_username', e.target.value)
+                            }
                             autoComplete="off"
                         />
                         <InputError message={errors.mqtt_username} />
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="mqtt_password">Password <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                        <Label htmlFor="mqtt_password">
+                            Password{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </Label>
                         <Input
                             id="mqtt_password"
                             type="password"
                             value={data.mqtt_password}
-                            onChange={(e) => setData('mqtt_password', e.target.value)}
+                            onChange={(e) =>
+                                setData('mqtt_password', e.target.value)
+                            }
                             autoComplete="new-password"
                         />
                         <InputError message={errors.mqtt_password} />
                     </div>
 
                     <div className="grid gap-2">
-                        <Label htmlFor="mqtt_topic_prefix">Topic Prefix <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                        <Label htmlFor="mqtt_topic_prefix">
+                            Topic Prefix{' '}
+                            <span className="font-normal text-muted-foreground">
+                                (optional)
+                            </span>
+                        </Label>
                         <Input
                             id="mqtt_topic_prefix"
                             value={data.mqtt_topic_prefix}
-                            onChange={(e) => setData('mqtt_topic_prefix', e.target.value)}
+                            onChange={(e) =>
+                                setData('mqtt_topic_prefix', e.target.value)
+                            }
                             placeholder="e.g. fleet/"
                             autoComplete="off"
                         />
@@ -184,7 +228,9 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
                 </CardContent>
 
                 <CardFooter className="pt-2">
-                    <Button type="submit" disabled={processing}>Save MQTT Settings</Button>
+                    <Button type="submit" disabled={processing}>
+                        Save MQTT Settings
+                    </Button>
                 </CardFooter>
             </form>
         </Card>
@@ -193,7 +239,13 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
 
 // ── API Keys Panel ─────────────────────────────────────────────────────────────
 
-function NewTokenBanner({ token, onDismiss }: { token: string; onDismiss: () => void }) {
+function NewTokenBanner({
+    token,
+    onDismiss,
+}: {
+    token: string;
+    onDismiss: () => void;
+}) {
     const [copied, setCopied] = useState(false);
 
     const copy = () => {
@@ -203,38 +255,64 @@ function NewTokenBanner({ token, onDismiss }: { token: string; onDismiss: () => 
     };
 
     return (
-        <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 space-y-2">
+        <div className="space-y-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4">
             <p className="text-sm font-medium text-status-warning">
                 Copy your new API token now — it won't be shown again.
             </p>
             <div className="flex items-center gap-2">
-                <code className="flex-1 rounded bg-background px-3 py-2 font-mono text-xs break-all border">
+                <code className="flex-1 rounded border bg-background px-3 py-2 font-mono text-xs break-all">
                     {token}
                 </code>
                 <Button size="sm" variant="outline" onClick={copy}>
-                    <Copy className="h-3.5 w-3.5 mr-1" />
+                    <Copy className="mr-1 h-3.5 w-3.5" />
                     {copied ? 'Copied!' : 'Copy'}
                 </Button>
             </div>
-            <Button size="sm" variant="ghost" className="text-xs text-muted-foreground" onClick={onDismiss}>
+            <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs text-muted-foreground"
+                onClick={onDismiss}
+            >
                 Dismiss
             </Button>
         </div>
     );
 }
 
-function CreateTokenDialog() {
+function CreateTokenDialog({
+    deviceGroups,
+}: {
+    deviceGroups: DeviceGroupOption[];
+}) {
     const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm<{
+        name: string;
+        expires_at: string;
+        device_group_ids: number[];
+    }>({
         name: '',
         expires_at: '',
+        device_group_ids: [],
     });
+
+    const toggleGroup = (groupId: number, checked: boolean) => {
+        setData(
+            'device_group_ids',
+            checked
+                ? [...data.device_group_ids, groupId]
+                : data.device_group_ids.filter((id) => id !== groupId),
+        );
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         post(adminApiTokens.store.url(), {
             preserveScroll: true,
-            onSuccess: () => { setOpen(false); reset(); },
+            onSuccess: () => {
+                setOpen(false);
+                reset();
+            },
         });
     };
 
@@ -245,20 +323,37 @@ function CreateTokenDialog() {
                 New Token
             </Button>
 
-            <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+            <Dialog
+                open={open}
+                onOpenChange={(v) => {
+                    setOpen(v);
+
+                    if (!v) {
+                        reset();
+                    }
+                }}
+            >
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Create API Token</DialogTitle>
-                        <DialogDescription>Generate a new API token for programmatic access.</DialogDescription>
+                        <DialogDescription>
+                            Generate a new API token for programmatic access.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form id="create-token-form" onSubmit={handleSubmit} className="space-y-4">
+                    <form
+                        id="create-token-form"
+                        onSubmit={handleSubmit}
+                        className="space-y-4"
+                    >
                         <div className="grid gap-2">
                             <Label htmlFor="token_name">Token Name</Label>
                             <Input
                                 id="token_name"
                                 value={data.name}
-                                onChange={(e) => setData('name', e.target.value)}
+                                onChange={(e) =>
+                                    setData('name', e.target.value)
+                                }
                                 placeholder="e.g. CI Pipeline"
                                 autoComplete="off"
                             />
@@ -266,20 +361,69 @@ function CreateTokenDialog() {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="expires_at">Expires At <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                            <Label htmlFor="expires_at">
+                                Expires At{' '}
+                                <span className="font-normal text-muted-foreground">
+                                    (optional)
+                                </span>
+                            </Label>
                             <Input
                                 id="expires_at"
                                 type="date"
                                 value={data.expires_at}
-                                onChange={(e) => setData('expires_at', e.target.value)}
+                                onChange={(e) =>
+                                    setData('expires_at', e.target.value)
+                                }
                             />
                             <InputError message={errors.expires_at} />
                         </div>
+
+                        {deviceGroups.length > 0 && (
+                            <div className="grid gap-2">
+                                <Label>
+                                    Device Groups{' '}
+                                    <span className="font-normal text-muted-foreground">
+                                        (none selected = all devices)
+                                    </span>
+                                </Label>
+                                <div className="grid max-h-40 gap-2 overflow-y-auto rounded-md border p-3">
+                                    {deviceGroups.map((group) => (
+                                        <label
+                                            key={group.id}
+                                            className="flex items-center gap-2 text-sm"
+                                        >
+                                            <Checkbox
+                                                checked={data.device_group_ids.includes(
+                                                    group.id,
+                                                )}
+                                                onCheckedChange={(checked) =>
+                                                    toggleGroup(
+                                                        group.id,
+                                                        checked === true,
+                                                    )
+                                                }
+                                            />
+                                            {group.name}
+                                        </label>
+                                    ))}
+                                </div>
+                                <InputError message={errors.device_group_ids} />
+                            </div>
+                        )}
                     </form>
 
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" form="create-token-form" disabled={processing}>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            form="create-token-form"
+                            disabled={processing}
+                        >
                             Generate Token
                         </Button>
                     </DialogFooter>
@@ -317,12 +461,25 @@ function DeleteTokenDialog({ token }: { token: ApiToken }) {
                     <DialogHeader>
                         <DialogTitle>Revoke Token</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to revoke <strong>{token.name}</strong>? Any apps using this token will lose access immediately.
+                            Are you sure you want to revoke{' '}
+                            <strong>{token.name}</strong>? Any apps using this
+                            token will lose access immediately.
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button variant="destructive" onClick={handleDelete} disabled={processing}>Revoke</Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => setOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDelete}
+                            disabled={processing}
+                        >
+                            Revoke
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -330,7 +487,17 @@ function DeleteTokenDialog({ token }: { token: ApiToken }) {
     );
 }
 
-function ApiTokensPanel({ tokens }: { tokens: ApiToken[] }) {
+function ApiTokensPanel({
+    tokens,
+    deviceGroups,
+}: {
+    tokens: ApiToken[];
+    deviceGroups: DeviceGroupOption[];
+}) {
+    const groupNames = new Map(
+        deviceGroups.map((group) => [group.id, group.name]),
+    );
+
     const { flash } = usePage<{ flash: { new_token?: string } }>().props;
     const [dismissed, setDismissed] = useState(false);
     const newToken = flash?.new_token;
@@ -344,28 +511,63 @@ function ApiTokensPanel({ tokens }: { tokens: ApiToken[] }) {
             accessorKey: 'token_preview',
             header: 'Token',
             cell: ({ row }) => (
-                <code className="font-mono text-xs text-muted-foreground">{row.original.token_preview}</code>
+                <code className="font-mono text-xs text-muted-foreground">
+                    {row.original.token_preview}
+                </code>
             ),
+        },
+        {
+            id: 'scope',
+            header: 'Scope',
+            cell: ({ row }) => {
+                const ids = row.original.device_group_ids;
+
+                return (
+                    <span className="text-sm text-muted-foreground">
+                        {ids === null || ids.length === 0
+                            ? 'All devices'
+                            : ids
+                                  .map((id) => groupNames.get(id) ?? `#${id}`)
+                                  .join(', ')}
+                    </span>
+                );
+            },
         },
         {
             accessorKey: 'created_by',
             header: 'Created By',
-            cell: ({ row }) => <span className="text-sm">{row.original.created_by ?? '—'}</span>,
+            cell: ({ row }) => (
+                <span className="text-sm">
+                    {row.original.created_by ?? '—'}
+                </span>
+            ),
         },
         {
             accessorKey: 'last_used_at',
             header: 'Last Used',
-            cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.last_used_at ?? 'Never'}</span>,
+            cell: ({ row }) => (
+                <span className="text-sm text-muted-foreground">
+                    {row.original.last_used_at ?? 'Never'}
+                </span>
+            ),
         },
         {
             accessorKey: 'expires_at',
             header: 'Expires',
-            cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.expires_at ?? 'Never'}</span>,
+            cell: ({ row }) => (
+                <span className="text-sm text-muted-foreground">
+                    {row.original.expires_at ?? 'Never'}
+                </span>
+            ),
         },
         {
             accessorKey: 'created_at',
             header: 'Created',
-            cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.created_at}</span>,
+            cell: ({ row }) => (
+                <span className="text-sm text-muted-foreground">
+                    {row.original.created_at}
+                </span>
+            ),
         },
         {
             id: 'actions',
@@ -389,12 +591,17 @@ function ApiTokensPanel({ tokens }: { tokens: ApiToken[] }) {
     return (
         <div className="space-y-4">
             {newToken && !dismissed && (
-                <NewTokenBanner token={newToken} onDismiss={() => setDismissed(true)} />
+                <NewTokenBanner
+                    token={newToken}
+                    onDismiss={() => setDismissed(true)}
+                />
             )}
 
             <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">{tokens.length} token(s)</p>
-                <CreateTokenDialog />
+                <p className="text-sm text-muted-foreground">
+                    {tokens.length} token(s)
+                </p>
+                <CreateTokenDialog deviceGroups={deviceGroups} />
             </div>
 
             <div className="rounded-md border">
@@ -404,7 +611,13 @@ function ApiTokensPanel({ tokens }: { tokens: ApiToken[] }) {
                             <TableRow key={hg.id}>
                                 {hg.headers.map((header) => (
                                     <TableHead key={header.id}>
-                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                        {header.isPlaceholder
+                                            ? null
+                                            : flexRender(
+                                                  header.column.columnDef
+                                                      .header,
+                                                  header.getContext(),
+                                              )}
                                     </TableHead>
                                 ))}
                             </TableRow>
@@ -416,14 +629,20 @@ function ApiTokensPanel({ tokens }: { tokens: ApiToken[] }) {
                                 <TableRow key={row.id}>
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            {flexRender(
+                                                cell.column.columnDef.cell,
+                                                cell.getContext(),
+                                            )}
                                         </TableCell>
                                     ))}
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                <TableCell
+                                    colSpan={columns.length}
+                                    className="h-24 text-center text-muted-foreground"
+                                >
                                     No tokens found. Create one to get started.
                                 </TableCell>
                             </TableRow>
@@ -434,9 +653,26 @@ function ApiTokensPanel({ tokens }: { tokens: ApiToken[] }) {
 
             {table.getPageCount() > 1 && (
                 <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                    <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
-                    <span>Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</span>
-                    <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                    >
+                        Previous
+                    </Button>
+                    <span>
+                        Page {table.getState().pagination.pageIndex + 1} of{' '}
+                        {table.getPageCount()}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                    >
+                        Next
+                    </Button>
                 </div>
             )}
         </div>
@@ -451,7 +687,9 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
             accessorKey: 'created_at',
             header: 'Time',
             cell: ({ row }) => (
-                <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">{row.original.created_at}</span>
+                <span className="font-mono text-xs whitespace-nowrap text-muted-foreground">
+                    {row.original.created_at}
+                </span>
             ),
         },
         {
@@ -466,18 +704,24 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
         {
             accessorKey: 'user',
             header: 'User',
-            cell: ({ row }) => <span className="text-sm font-medium">{row.original.user}</span>,
+            cell: ({ row }) => (
+                <span className="text-sm font-medium">{row.original.user}</span>
+            ),
         },
         {
             accessorKey: 'description',
             header: 'Description',
-            cell: ({ row }) => <span className="text-sm">{row.original.description}</span>,
+            cell: ({ row }) => (
+                <span className="text-sm">{row.original.description}</span>
+            ),
         },
         {
             accessorKey: 'ip_address',
             header: 'IP',
             cell: ({ row }) => (
-                <span className="font-mono text-xs text-muted-foreground">{row.original.ip_address ?? '—'}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                    {row.original.ip_address ?? '—'}
+                </span>
             ),
         },
     ];
@@ -493,7 +737,9 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">{logs.total} total entries</p>
+                <p className="text-sm text-muted-foreground">
+                    {logs.total} total entries
+                </p>
             </div>
 
             <div className="rounded-md border">
@@ -503,7 +749,13 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
                             <TableRow key={hg.id}>
                                 {hg.headers.map((header) => (
                                     <TableHead key={header.id}>
-                                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                                        {header.isPlaceholder
+                                            ? null
+                                            : flexRender(
+                                                  header.column.columnDef
+                                                      .header,
+                                                  header.getContext(),
+                                              )}
                                     </TableHead>
                                 ))}
                             </TableRow>
@@ -515,14 +767,20 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
                                 <TableRow key={row.id}>
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
-                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                            {flexRender(
+                                                cell.column.columnDef.cell,
+                                                cell.getContext(),
+                                            )}
                                         </TableCell>
                                     ))}
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                <TableCell
+                                    colSpan={columns.length}
+                                    className="h-24 text-center text-muted-foreground"
+                                >
                                     No audit entries yet.
                                 </TableCell>
                             </TableRow>
@@ -533,9 +791,26 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
 
             {table.getPageCount() > 1 && (
                 <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                    <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
-                    <span>Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}</span>
-                    <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                    >
+                        Previous
+                    </Button>
+                    <span>
+                        Page {table.getState().pagination.pageIndex + 1} of{' '}
+                        {table.getPageCount()}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                    >
+                        Next
+                    </Button>
                 </div>
             )}
         </div>
@@ -544,15 +819,25 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-export default function SystemSettingsIndex({ mqttSettings, apiTokens, auditLogs }: PageProps) {
+export default function SystemSettingsIndex({
+    mqttSettings,
+    apiTokens,
+    deviceGroups,
+    auditLogs,
+}: PageProps) {
     return (
         <>
             <Head title="System Settings" />
 
             <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
                 <div>
-                    <h1 className="text-xl font-semibold tracking-tight">System Settings</h1>
-                    <p className="text-sm text-muted-foreground">Configure MQTT, manage API tokens, and review the audit log.</p>
+                    <h1 className="text-xl font-semibold tracking-tight">
+                        System Settings
+                    </h1>
+                    <p className="text-sm text-muted-foreground">
+                        Configure MQTT, manage API tokens, and review the audit
+                        log.
+                    </p>
                 </div>
 
                 <Tabs defaultValue="mqtt">
@@ -576,7 +861,10 @@ export default function SystemSettingsIndex({ mqttSettings, apiTokens, auditLogs
                     </TabsContent>
 
                     <TabsContent value="api-keys" className="mt-6">
-                        <ApiTokensPanel tokens={apiTokens} />
+                        <ApiTokensPanel
+                            tokens={apiTokens}
+                            deviceGroups={deviceGroups}
+                        />
                     </TabsContent>
 
                     <TabsContent value="audit-log" className="mt-6">

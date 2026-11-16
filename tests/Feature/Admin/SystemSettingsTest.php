@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\ApiToken;
+use App\Models\Device;
+use App\Models\DeviceGroup;
 use App\Models\SystemSetting;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -75,4 +77,37 @@ it('admin can delete an API token', function () {
         ->assertRedirect();
 
     expect(ApiToken::find($token->id))->toBeNull();
+});
+
+it('grants fleet.read by default so UI-created tokens can call the fleet API', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/api-tokens', ['name' => 'Default Abilities']);
+
+    expect(ApiToken::where('name', 'Default Abilities')->value('abilities'))
+        ->toBe(['fleet.read']);
+});
+
+it('scopes API token fleet access to the selected device groups', function () {
+    $groupA = DeviceGroup::factory()->create();
+    $groupB = DeviceGroup::factory()->create();
+    Device::factory()->create(['device_group_id' => $groupA->id]);
+    Device::factory()->create(['device_group_id' => $groupB->id]);
+
+    $this->actingAs($this->admin)
+        ->post('/admin/api-tokens', ['name' => 'Scoped', 'device_group_ids' => [$groupA->id]])
+        ->assertSessionHasNoErrors();
+
+    $plaintext = session('new_token');
+    auth()->logout();
+
+    $this->withToken($plaintext)
+        ->getJson('/api/v1/fleet/devices')
+        ->assertOk()
+        ->assertJsonCount(1, 'data');
+});
+
+it('redirects the api-tokens index to system settings', function () {
+    $this->actingAs($this->admin)
+        ->get('/admin/api-tokens')
+        ->assertRedirect(route('admin.system-settings.index'));
 });
