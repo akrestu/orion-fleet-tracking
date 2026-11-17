@@ -14,7 +14,7 @@ class AlertFactory extends Factory
     public function definition(): array
     {
         return [
-            'dev_eui' => Device::factory()->create()->dev_eui,
+            'dev_eui' => fn () => Device::factory()->create()->dev_eui,
             'alert_type' => $this->faker->randomElement(['overspeed', 'geofence', 'offline', 'low_signal']),
             'triggered_at' => now()->subMinutes($this->faker->numberBetween(1, 1440)),
             'resolved_at' => null,

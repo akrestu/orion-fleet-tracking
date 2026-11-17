@@ -14,7 +14,7 @@ class GpsLogFactory extends Factory
     public function definition(): array
     {
         return [
-            'dev_eui' => Device::factory()->create()->dev_eui,
+            'dev_eui' => fn () => Device::factory()->create()->dev_eui,
             'latitude' => $this->faker->latitude(-5, -2),
             'longitude' => $this->faker->longitude(115, 120),
             'speed_kmh' => $this->faker->randomFloat(1, 0, 120),
