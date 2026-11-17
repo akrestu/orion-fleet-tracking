@@ -33,6 +33,12 @@ import {
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import { RouteHistoryLayer } from '@/components/Fleet/RouteHistoryLayer';
 import { unitMarkerIcon } from '@/components/orion/map-marker';
+import {
+    DateRangeButton,
+    ProductivityOverview,
+    QuickExport,
+    formatRange,
+} from '@/components/reports/report-panels';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -196,14 +202,17 @@ type GatewayRow = {
     last_seen: string;
 };
 
-const today = new Date().toISOString().slice(0, 10);
-const firstOfMonth = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth(),
-    1,
-)
-    .toISOString()
-    .slice(0, 10);
+/** Local calendar date as YYYY-MM-DD (toISOString() would shift to UTC and lose a day in WIB). */
+function localDate(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+const today = localDate(new Date());
+const firstOfMonth = localDate(
+    new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+);
 
 function buildQueryString(params: Record<string, string>): string {
     const qs = new URLSearchParams();
@@ -1666,7 +1675,10 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <Badge variant="danger" className="tabular-nums">
+                                            <Badge
+                                                variant="danger"
+                                                className="tabular-nums"
+                                            >
                                                 {s.violation_count}
                                             </Badge>
                                         </TableCell>
@@ -3224,87 +3236,128 @@ function ExportTab({ devices }: { devices: DeviceOption[] }) {
     );
 }
 
+const REPORT_TABS: { value: string; label: string }[] = [
+    { value: 'tracking', label: 'Tracking' },
+    { value: 'safety', label: 'Safety' },
+    { value: 'maintenance', label: 'Maintenance' },
+    { value: 'productivity', label: 'Productivity' },
+    { value: 'infrastructure', label: 'Infrastructure' },
+    { value: 'performance', label: 'Performance' },
+    { value: 'raw-gps', label: 'Raw GPS Data' },
+    { value: 'export', label: 'Export' },
+];
+
 export default function ReportsIndex({ devices, tilesets }: PageProps) {
-    const [activeTab, setActiveTab] = useUrlFilter('tab', 'raw-gps');
+    const [activeTab, setActiveTab] = useUrlFilter('tab', 'productivity');
+    const [dateFrom, setDateFrom] = useUrlFilter('from', firstOfMonth);
+    const [dateTo, setDateTo] = useUrlFilter('to', today);
+    const [devEui, setDevEui] = useUrlFilter('dev_eui', 'all');
+    // Tabs read their filters from the URL on mount; re-keying remounts them on a new range.
+    const rangeKey = `${dateFrom}|${dateTo}`;
 
     return (
         <>
             <Head title="Reports & Export" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight">
-                        Reports & Export
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Raw GPS tracker data plus tracking, productivity,
-                        safety, maintenance, performance, and infrastructure
-                        analytics.
-                    </p>
+            <div className="flex flex-col gap-5 p-4 md:p-7">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
+                            Reports & Export
+                        </h1>
+                        <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                            {formatRange(dateFrom, dateTo)} · {devices.length}{' '}
+                            devices
+                        </p>
+                    </div>
+                    <DateRangeButton
+                        from={dateFrom}
+                        to={dateTo}
+                        onChange={(from, to) => {
+                            setDateFrom(from);
+                            setDateTo(to);
+                        }}
+                    />
                 </div>
 
                 <Tabs
                     value={activeTab}
                     onValueChange={setActiveTab}
-                    className="flex flex-col gap-4"
+                    className="flex flex-col gap-5"
                 >
-                    <TabsList className="h-auto w-fit flex-wrap">
-                        <TabsTrigger value="raw-gps">Raw GPS Data</TabsTrigger>
-                        <TabsTrigger value="tracking">
-                            Tracking & Monitoring
-                        </TabsTrigger>
-                        <TabsTrigger value="productivity">
-                            Productivity
-                        </TabsTrigger>
-                        <TabsTrigger value="safety">
-                            Safety Monitoring
-                        </TabsTrigger>
-                        <TabsTrigger value="maintenance">
-                            Maintenance Insight
-                        </TabsTrigger>
-                        <TabsTrigger value="performance">
-                            Performance Analysis
-                        </TabsTrigger>
-                        <TabsTrigger value="infrastructure">
-                            Infrastructure Coverage
-                        </TabsTrigger>
-                        <TabsTrigger value="export">Export Data</TabsTrigger>
+                    <TabsList className="h-auto w-full [scrollbar-width:none] justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 [&::-webkit-scrollbar]:hidden">
+                        {REPORT_TABS.map((tab) => (
+                            <TabsTrigger
+                                key={tab.value}
+                                value={tab.value}
+                                className="h-11 flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-none dark:data-[state=active]:bg-transparent"
+                            >
+                                {tab.label}
+                            </TabsTrigger>
+                        ))}
                     </TabsList>
 
-                    <TabsContent value="raw-gps">
-                        <RawGpsDataTab devices={devices} />
-                    </TabsContent>
+                    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+                        <div key={rangeKey} className="min-w-0 [&>*]:min-w-0">
+                            <TabsContent value="tracking">
+                                <TrackingMonitoringTab
+                                    devices={devices}
+                                    tilesets={tilesets}
+                                />
+                            </TabsContent>
 
-                    <TabsContent value="tracking">
-                        <TrackingMonitoringTab
-                            devices={devices}
-                            tilesets={tilesets}
-                        />
-                    </TabsContent>
+                            <TabsContent value="safety">
+                                <SafetyMonitoringTab devices={devices} />
+                            </TabsContent>
 
-                    <TabsContent value="productivity">
-                        <CycleTimeTab devices={devices} />
-                    </TabsContent>
+                            <TabsContent value="maintenance">
+                                <FleetUtilizationTab devices={devices} />
+                            </TabsContent>
 
-                    <TabsContent value="safety">
-                        <SafetyMonitoringTab devices={devices} />
-                    </TabsContent>
+                            <TabsContent
+                                value="productivity"
+                                className="grid min-w-0 gap-5 [&>*]:min-w-0"
+                            >
+                                <ProductivityOverview
+                                    from={dateFrom}
+                                    to={dateTo}
+                                    devEui={devEui}
+                                />
+                                <section className="grid gap-3">
+                                    <h2 className="font-semibold">
+                                        Cycle detail
+                                    </h2>
+                                    <CycleTimeTab devices={devices} />
+                                </section>
+                            </TabsContent>
 
-                    <TabsContent value="maintenance">
-                        <FleetUtilizationTab devices={devices} />
-                    </TabsContent>
+                            <TabsContent value="infrastructure">
+                                <GatewayReliabilityTab />
+                            </TabsContent>
 
-                    <TabsContent value="performance">
-                        <DelayWaitingTab devices={devices} />
-                    </TabsContent>
+                            <TabsContent value="performance">
+                                <DelayWaitingTab devices={devices} />
+                            </TabsContent>
 
-                    <TabsContent value="infrastructure">
-                        <GatewayReliabilityTab />
-                    </TabsContent>
+                            <TabsContent value="raw-gps">
+                                <RawGpsDataTab devices={devices} />
+                            </TabsContent>
 
-                    <TabsContent value="export">
-                        <ExportTab devices={devices} />
-                    </TabsContent>
+                            <TabsContent value="export">
+                                <ExportTab devices={devices} />
+                            </TabsContent>
+                        </div>
+
+                        <div className="xl:sticky xl:top-6">
+                            <QuickExport
+                                devices={devices}
+                                from={dateFrom}
+                                to={dateTo}
+                                devEui={devEui}
+                                onDevEuiChange={setDevEui}
+                            />
+                        </div>
+                    </div>
                 </Tabs>
             </div>
         </>
