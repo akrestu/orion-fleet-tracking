@@ -1,6 +1,6 @@
-import type { UnitCategory } from '@/config/unit-types';
+import type { BackendUnitType } from '@/lib/orion/unit-types';
 
-export type { UnitCategory };
+export type UnitCategory = BackendUnitType;
 
 export interface GeofenceZone {
     id: number;

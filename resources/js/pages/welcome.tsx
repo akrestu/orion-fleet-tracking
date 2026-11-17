@@ -1,6 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Activity, MapPinned, ShieldCheck } from 'lucide-react';
-import { BrandLockup } from '@/components/brand-lockup';
+import { OrionLockup } from '@/components/orion/misc';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -39,7 +39,7 @@ export default function Welcome() {
             <Head title="Selamat Datang" />
             <div className="flex min-h-screen flex-col bg-background text-foreground">
                 <header className="flex items-center justify-between px-6 py-6 lg:px-12">
-                    <BrandLockup />
+                    <OrionLockup size={36} />
                     <nav className="flex items-center gap-2">
                         {auth.user ? (
                             <Button asChild>

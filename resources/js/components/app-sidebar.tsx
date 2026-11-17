@@ -11,9 +11,9 @@ import {
     SlidersHorizontal,
     Users,
 } from 'lucide-react';
-import { BrandLockup } from '@/components/brand-lockup';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
+import { OrionLockup } from '@/components/orion/misc';
 import {
     Sidebar,
     SidebarContent,
@@ -106,7 +106,7 @@ export function AppSidebar() {
                                 prefetch
                                 className="flex items-center gap-0"
                             >
-                                <BrandLockup size="sm" collapsible />
+                                <OrionLockup size={24} collapsible />
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

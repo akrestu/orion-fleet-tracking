@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
     flexRender,
     getCoreRowModel,
@@ -12,6 +12,7 @@ import { ArrowUpDown, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import DeviceController from '@/actions/App/Http/Controllers/Admin/DeviceController';
 import InputError from '@/components/input-error';
+import { UnitIcon } from '@/components/orion/unit-icon';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import type { BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,11 +44,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { UNIT_CATEGORIES } from '@/config/unit-types';
-import type { UnitCategory } from '@/config/unit-types';
+import { BACKEND_UNIT_TYPES, unitMeta } from '@/lib/orion/unit-types';
 import adminDevices, {
     index as adminDevicesIndex,
 } from '@/routes/admin/devices';
+import type { UnitCategory } from '@/types/fleet';
 
 type DeviceGroupRef = {
     id: number;
@@ -124,21 +125,16 @@ function DeviceFormFields({
     showDevEui: boolean;
     groups: DeviceGroupRef[];
 }) {
-    const unitTypeOptions: ComboboxOption[] = Object.entries(
-        UNIT_CATEGORIES,
-    ).map(([key, meta]) => ({
-        value: key,
-        label: meta.label,
-        prefix: (
-            <span
-                className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
-                style={{ background: meta.color }}
-            />
-        ),
-    }));
+    const { unitCategories } = usePage<PageProps>().props;
+    const unitTypeOptions: ComboboxOption[] = BACKEND_UNIT_TYPES.map(
+        (key) => ({
+            value: key,
+            label: unitCategories[key]?.label ?? unitMeta(key).label,
+            prefix: <UnitIcon type={unitMeta(key).key} size={18} />,
+        }),
+    );
 
-    const selectedCat = UNIT_CATEGORIES[values.unit_type as UnitCategory];
-    const models = selectedCat?.models ?? [];
+    const models = unitCategories[values.unit_type]?.models ?? [];
 
     const unitModelOptions: ComboboxOption[] = models.map((m) => ({
         value: m,
@@ -627,16 +623,12 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
             accessorKey: 'unit_type',
             header: 'Category',
             cell: ({ row }) => {
-                const cat =
-                    UNIT_CATEGORIES[row.original.unit_type] ??
-                    UNIT_CATEGORIES.other;
+                const cat = unitMeta(row.original.unit_type);
 
                 return (
-                    <span
-                        className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-bold text-white"
-                        style={{ backgroundColor: cat.color }}
-                    >
-                        {cat.abbr}
+                    <span className="inline-flex items-center gap-2 text-sm">
+                        <UnitIcon type={cat.key} size={22} />
+                        {cat.label}
                     </span>
                 );
             },

@@ -1,11 +1,13 @@
 import type L from 'leaflet';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
+import { unitMarkerIcon } from '@/components/orion/map-marker';
+import { UnitIcon } from '@/components/orion/unit-icon';
 import { StatusBadge } from '@/components/ui/badge';
-import { UNIT_CATEGORIES } from '@/config/unit-types';
 import { useAnimatedMarkerPosition } from '@/hooks/use-animated-marker';
+import { useAppearance } from '@/hooks/use-appearance';
 import { useTick } from '@/hooks/use-tick';
-import { createDeviceIcon } from '@/lib/device-icon';
+import { toUnitType, unitMeta } from '@/lib/orion/unit-types';
 import { formatRelativeTime, isStale } from '@/lib/time';
 import type { DevicePosition } from '@/types/fleet';
 
@@ -17,7 +19,8 @@ interface DeviceMarkerProps {
 export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
     const map = useMap();
     const markerRef = useRef<L.Marker>(null);
-    const cat = UNIT_CATEGORIES[device.unit_type] ?? UNIT_CATEGORIES.other;
+    const cat = unitMeta(device.unit_type);
+    const { resolvedAppearance } = useAppearance();
     const isOnline = device.status === 'online';
     useTick();
     const lastUpdate = formatRelativeTime(device.recorded_at);
@@ -49,13 +52,20 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
     }, [isSelected, map]);
 
     const icon = useMemo(
-        () => createDeviceIcon(device),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        () =>
+            unitMarkerIcon({
+                type: toUnitType(device.unit_type),
+                status: device.status,
+                heading: device.heading_deg,
+                selected: isSelected,
+                dark: resolvedAppearance === 'dark',
+            }),
         [
             device.status,
             device.unit_type,
-            device.device_name,
             device.heading_deg,
+            isSelected,
+            resolvedAppearance,
         ],
     );
 
@@ -64,7 +74,7 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
             ref={markerRef}
             position={initialPosition}
             icon={icon}
-            title={device.status}
+            title={`${device.device_name} · ${device.status}`}
         >
             <Popup>
                 <div className="min-w-[160px] text-sm">
@@ -84,14 +94,9 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
                         {device.dev_eui}
                     </p>
                     <div className="mt-1.5 flex items-center gap-1.5">
-                        <span
-                            className="inline-block rounded px-1.5 py-0.5 text-xs font-bold text-white"
-                            style={{ background: cat.color }}
-                        >
-                            {cat.abbr}
-                        </span>
+                        <UnitIcon type={cat.key} size={20} />
                         <span className="text-xs text-muted-foreground">
-                            {cat.label.split('–')[0].trim()}
+                            {cat.label}
                         </span>
                     </div>
                     <p className="mt-1 font-mono text-xs">
@@ -102,13 +107,11 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
                     </p>
                     {lastUpdate && (
                         <p
-                            className="mt-1 text-xs"
-                            style={{
-                                color: stale
-                                    ? 'var(--color-warning)'
-                                    : 'var(--color-muted-foreground)',
-                                fontWeight: stale ? 500 : undefined,
-                            }}
+                            className={
+                                stale
+                                    ? 'mt-1 text-xs font-medium text-warning'
+                                    : 'mt-1 text-xs text-muted-foreground'
+                            }
                         >
                             {stale && '⚠ '}
                             Update terakhir: {lastUpdate}

@@ -1,8 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
-import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { OrionLockup } from '@/components/orion/misc';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -93,7 +92,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                     Navigation menu
                                 </SheetTitle>
                                 <SheetHeader className="flex justify-start text-left">
-                                    <AppLogoIcon className="h-6 w-6 fill-current text-black dark:text-white" />
+                                    <OrionLockup size={24} />
                                 </SheetHeader>
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
                                     <div className="flex h-full flex-col justify-between text-sm">
@@ -139,17 +138,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                         prefetch
                         className="flex items-center gap-0"
                     >
-                        <img
-                            src="/wbk.png"
-                            alt="PT. WBK"
-                            className="h-8 w-8 rounded-lg object-cover"
-                        />
-                        <div className="mx-2 flex flex-col items-center gap-0.5 select-none">
-                            <div className="bg-border w-px h-3.5" />
-                            <span className="text-muted-foreground/40 text-[8px] font-medium tracking-widest uppercase leading-none">by</span>
-                            <div className="bg-border w-px h-3.5" />
-                        </div>
-                        <AppLogo />
+                        <OrionLockup />
                     </Link>
 
                     {/* Desktop Navigation */}

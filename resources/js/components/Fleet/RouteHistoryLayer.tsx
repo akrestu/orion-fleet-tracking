@@ -1,6 +1,7 @@
 import { CircleMarker, Polyline, Tooltip } from 'react-leaflet';
+import { speedBandColor } from '@/components/orion/map-marker';
+import { useAppearance } from '@/hooks/use-appearance';
 import { catmullRomSegment } from '@/lib/spline';
-import { getSpeedColor } from '@/lib/status-colors';
 import type { GpsLogPoint } from '@/types/fleet';
 
 interface Props {
@@ -16,6 +17,10 @@ function formatTime(iso: string): string {
 }
 
 export function RouteHistoryLayer({ points }: Props) {
+    const { resolvedAppearance } = useAppearance();
+    const dark = resolvedAppearance === 'dark';
+    const getSpeedColor = (kmh: number) => speedBandColor(kmh, dark);
+
     if (points.length < 2) {
         return null;
     }
@@ -52,7 +57,13 @@ export function RouteHistoryLayer({ points }: Props) {
                 <Polyline
                     key={i}
                     positions={seg.positions}
-                    pathOptions={{ color: seg.color, weight: 3, opacity: 0.8 }}
+                    pathOptions={{
+                        color: seg.color,
+                        weight: 5,
+                        opacity: 0.9,
+                        lineCap: 'round',
+                        lineJoin: 'round',
+                    }}
                 />
             ))}
 

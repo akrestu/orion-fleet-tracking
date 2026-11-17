@@ -48,8 +48,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { UNIT_CATEGORIES } from '@/config/unit-types';
-import { getSignalColor } from '@/lib/status-colors';
+import { signalColorVar } from '@/lib/orion/telemetry';
+import { BACKEND_UNIT_TYPES, unitMeta } from '@/lib/orion/unit-types';
 import { dashboard } from '@/routes';
 import admin from '@/routes/admin';
 import adminReports from '@/routes/admin/reports';
@@ -57,10 +57,9 @@ import fleet from '@/routes/fleet';
 
 /** Falls back to the "other" category for any unit_type value not in the canonical config. */
 function unitCategory(type: string) {
-    return (
-        UNIT_CATEGORIES[type as keyof typeof UNIT_CATEGORIES] ??
-        UNIT_CATEGORIES.other
-    );
+    const meta = unitMeta(type);
+
+    return { color: meta.colorVar, abbr: meta.code, label: meta.label };
 }
 
 const ALERT_META: Record<
@@ -106,9 +105,9 @@ const speedTrendConfig = {
 } satisfies ChartConfig;
 
 const compositionConfig: ChartConfig = Object.fromEntries(
-    Object.entries(UNIT_CATEGORIES).map(([key, cat]) => [
+    BACKEND_UNIT_TYPES.map((key) => [
         key,
-        { label: cat.abbr, color: cat.color },
+        { label: unitCategory(key).abbr, color: unitCategory(key).color },
     ]),
 );
 
@@ -745,7 +744,7 @@ export default function Dashboard({
                                             {gatewaySignal.map((entry) => (
                                                 <Cell
                                                     key={entry.gateway_id}
-                                                    fill={getSignalColor(
+                                                    fill={signalColorVar(
                                                         entry.avg_rssi,
                                                     )}
                                                 />

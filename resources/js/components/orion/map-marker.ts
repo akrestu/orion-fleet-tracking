@@ -1,5 +1,6 @@
 import L from 'leaflet';
-import { UNIT_TYPES, type UnitType } from '@/lib/orion/unit-types';
+import { UNIT_TYPES } from '@/lib/orion/unit-types';
+import type { UnitType } from '@/lib/orion/unit-types';
 
 export type MarkerStatus = 'online' | 'offline' | 'alert';
 
@@ -16,7 +17,14 @@ const RING: Record<MarkerStatus, string> = {
     alert: 'oklch(0.56 0.2 27)',
 };
 
-export function unitMarkerIcon(opts: { type: UnitType; status: MarkerStatus; heading?: number | null; size?: number; selected?: boolean; dark?: boolean }) {
+export function unitMarkerIcon(opts: {
+    type: UnitType;
+    status: MarkerStatus;
+    heading?: number | null;
+    size?: number;
+    selected?: boolean;
+    dark?: boolean;
+}) {
     const { type, status, heading, size = 40, selected, dark } = opts;
     const meta = UNIT_TYPES[type];
     const off = status === 'offline';
@@ -31,13 +39,26 @@ export function unitMarkerIcon(opts: { type: UnitType; status: MarkerStatus; hea
   ${notch}
   <g transform="translate(9 9) scale(0.81)"><path d="${meta.path}" fill="#fff"/></g>
 </svg>`;
-    return L.divIcon({ html, className: 'orion-marker', iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
+
+    return L.divIcon({
+        html,
+        className: 'orion-marker',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -size / 2],
+    });
 }
 
 /** Speed band → route polyline colour (single-hue ramp; fast is darker, never red). */
 export function speedBandColor(kmh: number, dark = false) {
-    if (kmh < 15) return dark ? 'oklch(0.5 0.08 232)' : 'oklch(0.78 0.09 232)';
-    if (kmh <= 35) return dark ? 'oklch(0.72 0.12 230)' : 'oklch(0.58 0.14 232)';
+    if (kmh < 15) {
+        return dark ? 'oklch(0.5 0.08 232)' : 'oklch(0.78 0.09 232)';
+    }
+
+    if (kmh <= 35) {
+        return dark ? 'oklch(0.72 0.12 230)' : 'oklch(0.58 0.14 232)';
+    }
+
     return dark ? 'oklch(0.88 0.08 225)' : 'oklch(0.38 0.12 242)';
 }
 

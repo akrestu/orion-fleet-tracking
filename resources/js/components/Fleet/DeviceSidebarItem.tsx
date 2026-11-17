@@ -1,7 +1,8 @@
+import { UnitIcon } from '@/components/orion/unit-icon';
 import { StatusBadge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { UNIT_CATEGORIES } from '@/config/unit-types';
 import { useTick } from '@/hooks/use-tick';
+import { unitMeta } from '@/lib/orion/unit-types';
 import { formatRelativeTime, isStale } from '@/lib/time';
 import type { DevicePosition } from '@/types/fleet';
 
@@ -18,7 +19,7 @@ export function DeviceSidebarItem({
 }: DeviceSidebarItemProps) {
     useTick();
     const isOnline = device.status === 'online';
-    const cat = UNIT_CATEGORIES[device.unit_type] ?? UNIT_CATEGORIES.other;
+    const cat = unitMeta(device.unit_type);
     const lastUpdate = formatRelativeTime(device.recorded_at);
     const stale = isOnline && isStale(device.recorded_at);
 
@@ -40,19 +41,14 @@ export function DeviceSidebarItem({
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     {/* Category badge with category color */}
-                    <span
-                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold text-white"
-                        style={{ backgroundColor: cat.color }}
-                    >
-                        {cat.abbr}
-                    </span>
+                    <UnitIcon type={cat.key} size={22} muted={!isOnline} />
                     {device.unit_model ? (
                         <span className="text-xs font-medium text-muted-foreground">
                             {device.unit_model}
                         </span>
                     ) : (
                         <span className="text-xs text-muted-foreground">
-                            {cat.label.split('–')[0].trim()}
+                            {cat.label}
                         </span>
                     )}
                 </div>

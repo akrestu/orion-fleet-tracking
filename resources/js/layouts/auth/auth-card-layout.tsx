@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { BrandLockup } from '@/components/brand-lockup';
+import { OrionLockup } from '@/components/orion/misc';
 import {
     Card,
     CardContent,
@@ -22,7 +22,7 @@ export default function AuthCardLayout({
             <div className="relative z-10 flex w-full max-w-md flex-col">
                 <Card className="border-border/50 bg-card/70 shadow-2xl backdrop-blur-md">
                     <CardHeader className="px-10 pt-10 pb-0 text-center">
-                        <BrandLockup className="mb-6 justify-center" />
+                        <OrionLockup size={36} className="mb-6 justify-center" />
                         <CardTitle className="text-xl">{title}</CardTitle>
                         <CardDescription>{description}</CardDescription>
                     </CardHeader>

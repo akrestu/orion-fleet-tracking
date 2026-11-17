@@ -12,15 +12,15 @@ import {
     useMapEvents,
 } from 'react-leaflet';
 
-import { ConnectionBadge } from '@/components/Fleet/ConnectionBadge';
 import { DeviceMarker } from '@/components/Fleet/DeviceMarker';
 import { DeviceSidebarItem } from '@/components/Fleet/DeviceSidebarItem';
 import { GeofenceLayer } from '@/components/Fleet/GeofenceLayer';
-import { MapMarker } from '@/components/Fleet/MapMarker';
 import { MapTileUpload } from '@/components/Fleet/MapTileUpload';
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import { RouteHistoryLayer } from '@/components/Fleet/RouteHistoryLayer';
 import { SignalHeatmapLayer } from '@/components/Fleet/SignalHeatmapLayer';
+import { ConnectionBadge } from '@/components/orion/badges';
+import { UnitIcon } from '@/components/orion/unit-icon';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -31,6 +31,7 @@ import { useFleetTracking } from '@/hooks/use-fleet-tracking';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useRouteHistory } from '@/hooks/useRouteHistory';
 import type { TimeRange } from '@/hooks/useRouteHistory';
+import { unitMeta } from '@/lib/orion/unit-types';
 import fleet from '@/routes/fleet';
 import type { Auth } from '@/types/auth';
 import type { DevicePosition, GeofenceZone } from '@/types/fleet';
@@ -180,7 +181,7 @@ export default function FleetMap({
                 <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                     Devices
                 </p>
-                <ConnectionBadge connected={isConnected} />
+                <ConnectionBadge state={isConnected ? 'connected' : 'reconnecting'} />
             </div>
 
             {/* Stats / filter status — juga berfungsi sebagai legenda */}
@@ -279,14 +280,16 @@ export default function FleetMap({
             {selectedDevEui && (
                 <div className="border-b border-border px-4 py-2">
                     {selectedDevice && (
-                        <MapMarker
-                            unitType={selectedDevice.unit_type}
-                            status={selectedDevice.status}
-                            label={selectedDevice.device_name}
-                            selected
-                            className="mb-2 cursor-default"
-                            tabIndex={-1}
-                        />
+                        <div className="mb-2 flex items-center gap-2">
+                            <UnitIcon
+                                type={unitMeta(selectedDevice.unit_type).key}
+                                size={22}
+                                muted={selectedDevice.status === 'offline'}
+                            />
+                            <span className="truncate text-sm font-semibold">
+                                {selectedDevice.device_name}
+                            </span>
+                        </div>
                     )}
                     <p className="mb-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                         Riwayat Rute{' '}

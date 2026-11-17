@@ -9,6 +9,7 @@ import {
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import { ArrowLeft, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
+import { UnitIcon } from '@/components/orion/unit-icon';
 import { Badge, StatusBadge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,9 +21,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { UNIT_CATEGORIES } from '@/config/unit-types';
-import type { UnitCategory } from '@/config/unit-types';
+import { unitMeta } from '@/lib/orion/unit-types';
 import { index as adminDevicesIndex } from '@/routes/admin/devices';
+import type { UnitCategory } from '@/types/fleet';
 
 type AdminDevice = {
     id: number;
@@ -55,7 +56,7 @@ type PageProps = {
 };
 
 function DeviceInfoCard({ device }: { device: AdminDevice }) {
-    const cat = UNIT_CATEGORIES[device.unit_type] ?? UNIT_CATEGORIES.other;
+    const cat = unitMeta(device.unit_type);
 
     return (
         <Card>
@@ -85,13 +86,8 @@ function DeviceInfoCard({ device }: { device: AdminDevice }) {
                     <div>
                         <dt className="text-muted-foreground">Category</dt>
                         <dd>
-                            <span
-                                className="inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-bold text-white"
-                                style={{ backgroundColor: cat.color }}
-                            >
-                                {cat.abbr}
-                            </span>{' '}
-                            <span className="text-muted-foreground">
+                            <span className="inline-flex items-center gap-2">
+                                <UnitIcon type={cat.key} size={22} />
                                 {cat.label}
                             </span>
                         </dd>

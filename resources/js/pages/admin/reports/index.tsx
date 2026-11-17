@@ -32,6 +32,7 @@ import {
 } from 'react-leaflet';
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import { RouteHistoryLayer } from '@/components/Fleet/RouteHistoryLayer';
+import { unitMarkerIcon } from '@/components/orion/map-marker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -63,10 +64,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAnimatedMarkerPosition } from '@/hooks/use-animated-marker';
 import { useUrlFilter } from '@/hooks/useUrlFilter';
-import { createDeviceIcon } from '@/lib/device-icon';
+import { toUnitType } from '@/lib/orion/unit-types';
 import adminReports from '@/routes/admin/reports';
 import fleet from '@/routes/fleet';
-import type { GpsLogPoint, UnitCategory } from '@/types/fleet';
+import type { GpsLogPoint } from '@/types/fleet';
 
 type DeviceOption = {
     dev_eui: string;
@@ -717,11 +718,10 @@ function PlaybackMarker({
     // live connectivity, which doesn't apply to historical playback.
     const icon = useMemo(
         () =>
-            createDeviceIcon({
-                unit_type: (device?.unit_type ?? 'other') as UnitCategory,
+            unitMarkerIcon({
+                type: toUnitType(device?.unit_type),
                 status: 'online',
-                heading_deg: point.heading_deg,
-                device_name: device?.device_name ?? null,
+                heading: point.heading_deg,
             }),
         [device, point.heading_deg],
     );

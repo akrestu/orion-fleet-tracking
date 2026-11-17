@@ -1,5 +1,6 @@
+import { UNIT_TYPES } from '@/lib/orion/unit-types';
+import type { UnitType } from '@/lib/orion/unit-types';
 import { cn } from '@/lib/utils';
-import { UNIT_TYPES, type UnitType } from '@/lib/orion/unit-types';
 
 interface UnitIconProps {
     type: UnitType;
@@ -16,7 +17,14 @@ interface UnitIconProps {
     title?: string;
 }
 
-export function UnitIcon({ type, size = 24, variant = 'plain', muted, className, title }: UnitIconProps) {
+export function UnitIcon({
+    type,
+    size = 24,
+    variant = 'plain',
+    muted,
+    className,
+    title,
+}: UnitIconProps) {
     const meta = UNIT_TYPES[type];
     const svg = (
         <svg
@@ -27,16 +35,34 @@ export function UnitIcon({ type, size = 24, variant = 'plain', muted, className,
             aria-label={title}
             aria-hidden={title ? undefined : true}
         >
-            <path d={meta.path} fill={variant === 'tile' ? '#fff' : meta.colorVar} />
+            <path
+                d={meta.path}
+                fill={variant === 'tile' ? '#fff' : meta.colorVar}
+            />
         </svg>
     );
 
     if (variant === 'plain') {
-        return <span className={cn('inline-flex shrink-0', muted && 'opacity-50', className)}>{svg}</span>;
+        return (
+            <span
+                className={cn(
+                    'inline-flex shrink-0',
+                    muted && 'opacity-50',
+                    className,
+                )}
+            >
+                {svg}
+            </span>
+        );
     }
+
     return (
         <span
-            className={cn('inline-grid shrink-0 place-items-center rounded-[28%]', muted && 'opacity-55', className)}
+            className={cn(
+                'inline-grid shrink-0 place-items-center rounded-[28%]',
+                muted && 'opacity-55',
+                className,
+            )}
             style={{ width: size, height: size, background: meta.colorVar }}
         >
             {svg}
