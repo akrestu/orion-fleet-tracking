@@ -36,6 +36,9 @@ class Device extends Model
         return $this->belongsTo(DeviceGroup::class);
     }
 
+    /**
+     * @return HasMany<GpsLog, $this>
+     */
     public function gpsLogs(): HasMany
     {
         return $this->hasMany(GpsLog::class, 'dev_eui', 'dev_eui');

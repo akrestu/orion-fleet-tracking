@@ -56,7 +56,9 @@ class ChirpstackUplinkReceived implements ShouldBroadcast
             'hdop' => $this->gpsLog->hdop,
             'rssi' => $this->gpsLog->rssi,
             'snr' => $this->gpsLog->snr ? (float) $this->gpsLog->snr : null,
-            'recorded_at' => $this->gpsLog->recorded_at?->toIso8601String(),
+            'satellites' => $this->gpsLog->satellites,
+            'gateway_id' => $this->gpsLog->gateway_id,
+            'recorded_at' => $this->gpsLog->recorded_at->toIso8601String(),
         ];
     }
 }

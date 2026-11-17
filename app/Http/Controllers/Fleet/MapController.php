@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Fleet;
 
 use App\Http\Controllers\Controller;
+use App\Models\Alert;
 use App\Models\Device;
 use App\Models\Geofence;
 use App\Models\MapTileset;
@@ -22,10 +23,20 @@ class MapController extends Controller
             ->orderBy('device_name')
             ->get();
 
-        $positions = $devices->map(function ($device) {
+        /** @var array<string, true> $alerting */
+        $alerting = Alert::unresolved()
+            ->whereIn('dev_eui', $devices->pluck('dev_eui'))
+            ->distinct()
+            ->pluck('dev_eui')
+            ->flip()
+            ->map(fn () => true)
+            ->all();
+
+        $positions = $devices->map(function ($device) use ($alerting) {
             $latest = $device->gpsLogs->first();
 
             return [
+                'id' => $device->id,
                 'dev_eui' => $device->dev_eui,
                 'device_name' => $device->device_name,
                 'unit_type' => $device->unit_type,
@@ -38,6 +49,9 @@ class MapController extends Controller
                 'hdop' => $latest?->hdop ? (float) $latest->hdop : null,
                 'rssi' => $latest?->rssi,
                 'snr' => $latest?->snr ? (float) $latest->snr : null,
+                'satellites' => $latest?->satellites,
+                'gateway_id' => $latest?->gateway_id,
+                'has_alert' => isset($alerting[$device->dev_eui]),
                 'recorded_at' => $latest?->recorded_at?->toIso8601String(),
             ];
         });
@@ -58,6 +72,7 @@ class MapController extends Controller
                 'id' => $g->id,
                 'name' => $g->name,
                 'color' => $g->color,
+                'zone_type' => $g->zone_type,
                 'polygon' => $g->polygon,
             ]);
 

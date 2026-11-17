@@ -24,7 +24,13 @@ export function useFleetTracking(
     const isConnected = useConnectionStatus() === 'connected';
 
     const handlePositionUpdate = useCallback((data: DevicePosition) => {
-        setPositions((prev) => new Map(prev).set(data.dev_eui, data));
+        setPositions((prev) =>
+            // Merge so fields the broadcast omits (unit_model, has_alert) survive live updates.
+            new Map(prev).set(data.dev_eui, {
+                ...prev.get(data.dev_eui),
+                ...data,
+            }),
+        );
     }, []);
 
     useEffect(() => {

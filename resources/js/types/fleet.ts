@@ -6,6 +6,7 @@ export interface GeofenceZone {
     id: number;
     name: string;
     color: string;
+    zone_type?: 'none' | 'loading' | 'dumping' | 'parking';
     polygon: { lat: number; lng: number }[];
 }
 
@@ -22,6 +23,8 @@ export interface GpsLogPoint {
 }
 
 export interface DevicePosition {
+    /** Device primary key (Fleet Map initial load only; used for the admin Details link). */
+    id?: number;
     dev_eui: string;
     device_name: string;
     unit_type: UnitCategory;
@@ -34,5 +37,9 @@ export interface DevicePosition {
     hdop: number | null;
     rssi: number | null;
     snr: number | null;
+    satellites?: number | null;
+    gateway_id?: string | null;
+    /** True while the unit has an unresolved alert (initial page load only; kept across live updates). */
+    has_alert?: boolean;
     recorded_at: string | null;
 }

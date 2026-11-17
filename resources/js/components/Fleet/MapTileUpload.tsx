@@ -55,7 +55,14 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/fleet/map/tiles');
-        xhr.setRequestHeader('X-CSRF-TOKEN', (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '');
+        xhr.setRequestHeader(
+            'X-CSRF-TOKEN',
+            (
+                document.querySelector(
+                    'meta[name="csrf-token"]',
+                ) as HTMLMetaElement
+            )?.content ?? '',
+        );
         xhr.responseType = 'json';
 
         xhr.upload.onprogress = (event) => {
@@ -83,12 +90,16 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
             }
 
             if (xhr.status === 413) {
-                setError('File terlalu besar untuk diterima server (batas ukuran upload server terlampaui).');
+                setError(
+                    'File terlalu besar untuk diterima server (batas ukuran upload server terlampaui).',
+                );
 
                 return;
             }
 
-            setError(xhr.response?.message ?? `Upload gagal (HTTP ${xhr.status}).`);
+            setError(
+                xhr.response?.message ?? `Upload gagal (HTTP ${xhr.status}).`,
+            );
         };
 
         xhr.onerror = () => {
@@ -98,7 +109,9 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
 
         xhr.ontimeout = () => {
             setUploading(false);
-            setError('Upload timeout. File mungkin terlalu besar atau koneksi lambat.');
+            setError(
+                'Upload timeout. File mungkin terlalu besar atau koneksi lambat.',
+            );
         };
 
         xhr.send(form);
@@ -112,7 +125,12 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
         await fetch(`/fleet/map/tiles/${tileset.id}`, {
             method: 'DELETE',
             headers: {
-                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                'X-CSRF-TOKEN':
+                    (
+                        document.querySelector(
+                            'meta[name="csrf-token"]',
+                        ) as HTMLMetaElement
+                    )?.content ?? '',
             },
         });
 
@@ -122,7 +140,11 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="secondary" size="sm" title="Kelola peta kustom">
+                <Button
+                    variant="secondary"
+                    size="sm"
+                    title="Kelola peta kustom"
+                >
                     <UploadCloudIcon className="h-3.5 w-3.5" />
                     Peta Kustom
                 </Button>
@@ -133,19 +155,27 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
                     <DialogTitle>Peta Kustom Tim Engineering</DialogTitle>
                     <DialogDescription>
                         Upload file ZIP berisi tile peta dengan struktur{' '}
-                        <code className="text-primary">{'{z}/{x}/{y}.png'}</code>.
+                        <code className="text-primary">
+                            {'{z}/{x}/{y}.png'}
+                        </code>
+                        .
                     </DialogDescription>
                 </DialogHeader>
 
                 {tilesets.length > 0 && (
                     <div className="space-y-1.5">
-                        <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Tersimpan</p>
+                        <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                            Tersimpan
+                        </p>
                         {tilesets.map((t) => (
-                            <div key={t.id} className="bg-muted flex items-center justify-between rounded-md px-3 py-2">
+                            <div
+                                key={t.id}
+                                className="flex items-center justify-between rounded-md bg-muted px-3 py-2"
+                            >
                                 <span className="text-sm">{t.name}</span>
                                 <button
                                     onClick={() => handleDelete(t)}
-                                    className="text-muted-foreground hover:text-destructive transition-colors"
+                                    className="text-muted-foreground transition-colors hover:text-destructive"
                                     title="Hapus peta"
                                 >
                                     <Trash2Icon className="h-4 w-4" />
@@ -174,32 +204,46 @@ export function MapTileUpload({ tilesets, onUploaded, onDeleted }: Props) {
                             ref={fileRef}
                             type="file"
                             accept=".zip"
-                            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                            onChange={(e) =>
+                                setFile(e.target.files?.[0] ?? null)
+                            }
                             required
                         />
-                        <p className="text-muted-foreground text-xs">
+                        <p className="text-xs text-muted-foreground">
                             Maks. 500 MB. Struktur ZIP:{' '}
-                            <code className="text-primary">{'{z}/{x}/{y}.png'}</code>
+                            <code className="text-primary">
+                                {'{z}/{x}/{y}.png'}
+                            </code>
                         </p>
                     </div>
 
                     {uploading && (
                         <div className="space-y-1">
-                            <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                                 <div
-                                    className="bg-primary h-full transition-all"
+                                    className="h-full bg-primary transition-all"
                                     style={{ width: `${progress}%` }}
                                 />
                             </div>
-                            <p className="text-muted-foreground text-xs">{progress}%</p>
+                            <p className="text-xs text-muted-foreground">
+                                {progress}%
+                            </p>
                         </div>
                     )}
 
-                    {error && <p className="text-destructive text-xs">{error}</p>}
+                    {error && (
+                        <p className="text-xs text-destructive">{error}</p>
+                    )}
 
                     <DialogFooter>
-                        <Button type="submit" disabled={uploading || !name.trim() || !file} className="w-full">
-                            {uploading ? `Mengupload... ${progress}%` : 'Upload Peta'}
+                        <Button
+                            type="submit"
+                            disabled={uploading || !name.trim() || !file}
+                            className="w-full"
+                        >
+                            {uploading
+                                ? `Mengupload... ${progress}%`
+                                : 'Upload Peta'}
                         </Button>
                     </DialogFooter>
                 </form>

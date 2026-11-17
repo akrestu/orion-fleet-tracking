@@ -1,9 +1,7 @@
+import { LastSeen } from '@/components/orion/misc';
 import { UnitIcon } from '@/components/orion/unit-icon';
-import { StatusBadge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { useTick } from '@/hooks/use-tick';
 import { unitMeta } from '@/lib/orion/unit-types';
-import { formatRelativeTime, isStale } from '@/lib/time';
+import { cn } from '@/lib/utils';
 import type { DevicePosition } from '@/types/fleet';
 
 interface DeviceSidebarItemProps {
@@ -12,69 +10,64 @@ interface DeviceSidebarItemProps {
     onClick: () => void;
 }
 
+/** Fleet Map device row: UnitIcon · name / last seen · speed · status dot (52 px). */
 export function DeviceSidebarItem({
     device,
     isSelected,
     onClick,
 }: DeviceSidebarItemProps) {
-    useTick();
     const isOnline = device.status === 'online';
     const cat = unitMeta(device.unit_type);
-    const lastUpdate = formatRelativeTime(device.recorded_at);
-    const stale = isOnline && isStale(device.recorded_at);
+    const statusLabel = device.has_alert
+        ? 'Alert'
+        : isOnline
+          ? 'Online'
+          : 'Offline';
 
     return (
-        <>
-            <button
-                onClick={onClick}
-                className={`w-full px-4 py-3 text-left transition-colors hover:bg-muted/50 ${isSelected ? 'border-l-2 border-primary bg-primary/10' : 'border-l-2 border-transparent'}`}
-            >
-                <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium text-foreground">
-                        {device.device_name}
-                    </span>
-                    <StatusBadge
-                        status={isOnline ? 'online' : 'offline'}
-                        className="shrink-0"
-                    />
-                </div>
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={isSelected}
+            aria-label={`${device.device_name}, ${statusLabel}`}
+            className={cn(
+                'flex min-h-[52px] w-full items-center gap-3 border-b px-4 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                isSelected && 'bg-accent shadow-[inset_3px_0_0_var(--primary)]',
+            )}
+        >
+            <UnitIcon type={cat.key} size={26} muted={!isOnline} />
 
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                    {/* Category badge with category color */}
-                    <UnitIcon type={cat.key} size={22} muted={!isOnline} />
-                    {device.unit_model ? (
-                        <span className="text-xs font-medium text-muted-foreground">
-                            {device.unit_model}
-                        </span>
+            <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-foreground">
+                    {device.device_name}
+                    {device.unit_model && ` ${device.unit_model}`}
+                </span>
+                <span className="block text-xs">
+                    {device.recorded_at ? (
+                        <LastSeen at={device.recorded_at} />
                     ) : (
-                        <span className="text-xs text-muted-foreground">
-                            {cat.label}
+                        <span className="text-muted-foreground">
+                            No GPS fix
                         </span>
                     )}
-                </div>
+                </span>
+            </span>
 
-                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{device.speed_kmh.toFixed(1)} km/h</span>
-                    {device.heading_deg !== null && (
-                        <span>{device.heading_deg}°</span>
-                    )}
-                    <span className="truncate font-mono text-xs opacity-60">
-                        {device.dev_eui}
-                    </span>
-                </div>
+            <span className="shrink-0 text-sm text-foreground tabular-nums">
+                {isOnline ? `${device.speed_kmh.toFixed(1)} km/h` : '—'}
+            </span>
 
-                {lastUpdate && (
-                    <div className="mt-1 flex items-center gap-1">
-                        <span
-                            className={`text-xs ${stale ? 'font-medium text-warning' : 'text-muted-foreground'}`}
-                        >
-                            {stale && '⚠ '}
-                            Update terakhir: {lastUpdate}
-                        </span>
-                    </div>
+            <span
+                aria-hidden
+                className={cn(
+                    'size-2 shrink-0 rounded-full',
+                    device.has_alert
+                        ? 'bg-danger'
+                        : isOnline
+                          ? 'bg-online'
+                          : 'bg-offline',
                 )}
-            </button>
-            <Separator />
-        </>
+            />
+        </button>
     );
 }

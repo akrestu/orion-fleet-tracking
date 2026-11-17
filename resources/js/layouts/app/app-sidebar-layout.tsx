@@ -23,15 +23,21 @@ export default function AppSidebarLayout({
     const activeTab = BOTTOM_NAV_PREFIXES.find(([prefix]) =>
         currentUrl.startsWith(prefix),
     )?.[1];
+    // The Fleet Map is full-bleed: its device panel / mobile top bar replace the shell header.
+    const isFullBleed = activeTab === 'map';
 
     return (
         <AppShell variant="sidebar">
             <AppSidebar />
             <AppContent
                 variant="sidebar"
-                className="flex flex-col overflow-hidden pb-28 md:pb-0"
+                className={
+                    isFullBleed
+                        ? 'flex h-svh flex-col overflow-hidden'
+                        : 'flex flex-col overflow-hidden pb-28 md:pb-0'
+                }
             >
-                <AppSidebarHeader breadcrumbs={breadcrumbs} />
+                {!isFullBleed && <AppSidebarHeader breadcrumbs={breadcrumbs} />}
                 {children}
             </AppContent>
             <BottomNav active={activeTab} />

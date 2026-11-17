@@ -1,30 +1,40 @@
 import type L from 'leaflet';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
+import { UnitPopupContent } from '@/components/Fleet/map-overlays';
 import { unitMarkerIcon } from '@/components/orion/map-marker';
-import { UnitIcon } from '@/components/orion/unit-icon';
-import { StatusBadge } from '@/components/ui/badge';
+import type { MarkerStatus } from '@/components/orion/map-marker';
 import { useAnimatedMarkerPosition } from '@/hooks/use-animated-marker';
 import { useAppearance } from '@/hooks/use-appearance';
-import { useTick } from '@/hooks/use-tick';
-import { toUnitType, unitMeta } from '@/lib/orion/unit-types';
-import { formatRelativeTime, isStale } from '@/lib/time';
+import { toUnitType } from '@/lib/orion/unit-types';
 import type { DevicePosition } from '@/types/fleet';
 
 interface DeviceMarkerProps {
     device: DevicePosition;
     isSelected: boolean;
+    canOpenDetails?: boolean;
+    onSelect?: (devEui: string) => void;
 }
 
-export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
+const PULSE_CLASS = 'orion-marker-pulse';
+
+function prefersReducedMotion(): boolean {
+    return (
+        typeof window !== 'undefined' &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+}
+
+export function DeviceMarker({
+    device,
+    isSelected,
+    canOpenDetails = false,
+    onSelect,
+}: DeviceMarkerProps) {
     const map = useMap();
     const markerRef = useRef<L.Marker>(null);
-    const cat = unitMeta(device.unit_type);
     const { resolvedAppearance } = useAppearance();
-    const isOnline = device.status === 'online';
-    useTick();
-    const lastUpdate = formatRelativeTime(device.recorded_at);
-    const stale = isOnline && isStale(device.recorded_at);
+    const status: MarkerStatus = device.has_alert ? 'alert' : device.status;
 
     const positionRef = useRef<[number, number]>([
         device.latitude,
@@ -41,13 +51,39 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
         positionRef.current = [device.latitude, device.longitude];
     });
 
-    useAnimatedMarkerPosition(markerRef, [device.latitude, device.longitude]);
+    // 200 ms glide per spec; reduced-motion users get an instant jump.
+    useAnimatedMarkerPosition(
+        markerRef,
+        [device.latitude, device.longitude],
+        prefersReducedMotion() ? 1 : 200,
+    );
 
-    // Fly to the unit only when it becomes selected, not on every live position update —
-    // otherwise a moving, selected unit would keep interrupting its own flyTo animation.
+    // Pulse ring on every new fix (CSS disables it under prefers-reduced-motion).
+    const firstFix = useRef(device.recorded_at);
+    useEffect(() => {
+        const el = markerRef.current?.getElement();
+
+        if (!el || device.recorded_at === firstFix.current) {
+            return;
+        }
+
+        el.classList.remove(PULSE_CLASS);
+        void el.offsetWidth; // restart the animation
+        el.classList.add(PULSE_CLASS);
+        const timer = window.setTimeout(
+            () => el.classList.remove(PULSE_CLASS),
+            1100,
+        );
+
+        return () => window.clearTimeout(timer);
+    }, [device.recorded_at]);
+
+    // Fly to the unit and open its popup only when it becomes selected, not on every
+    // live update — otherwise a moving, selected unit would keep interrupting flyTo.
     useEffect(() => {
         if (isSelected) {
             map.flyTo(positionRef.current, map.getZoom(), { duration: 0.75 });
+            markerRef.current?.openPopup();
         }
     }, [isSelected, map]);
 
@@ -55,13 +91,13 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
         () =>
             unitMarkerIcon({
                 type: toUnitType(device.unit_type),
-                status: device.status,
+                status,
                 heading: device.heading_deg,
                 selected: isSelected,
                 dark: resolvedAppearance === 'dark',
             }),
         [
-            device.status,
+            status,
             device.unit_type,
             device.heading_deg,
             isSelected,
@@ -74,65 +110,21 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
             ref={markerRef}
             position={initialPosition}
             icon={icon}
-            title={`${device.device_name} · ${device.status}`}
+            title={`${device.device_name} · ${status}`}
+            keyboard
+            eventHandlers={{
+                click: () => {
+                    if (!isSelected) {
+                        onSelect?.(device.dev_eui);
+                    }
+                },
+            }}
         >
-            <Popup>
-                <div className="min-w-[160px] text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                        <p className="font-semibold">{device.device_name}</p>
-                        <StatusBadge
-                            status={isOnline ? 'online' : 'offline'}
-                            className="shrink-0 text-[10px]"
-                        />
-                    </div>
-                    {device.unit_model && (
-                        <p className="text-xs text-muted-foreground">
-                            {device.unit_model}
-                        </p>
-                    )}
-                    <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                        {device.dev_eui}
-                    </p>
-                    <div className="mt-1.5 flex items-center gap-1.5">
-                        <UnitIcon type={cat.key} size={20} />
-                        <span className="text-xs text-muted-foreground">
-                            {cat.label}
-                        </span>
-                    </div>
-                    <p className="mt-1 font-mono text-xs">
-                        {device.speed_kmh.toFixed(1)} km/h
-                        {device.heading_deg !== null
-                            ? ` · ${device.heading_deg}°`
-                            : ''}
-                    </p>
-                    {lastUpdate && (
-                        <p
-                            className={
-                                stale
-                                    ? 'mt-1 text-xs font-medium text-warning'
-                                    : 'mt-1 text-xs text-muted-foreground'
-                            }
-                        >
-                            {stale && '⚠ '}
-                            Update terakhir: {lastUpdate}
-                        </p>
-                    )}
-                    {(device.rssi !== null || device.snr !== null) && (
-                        <p className="font-mono text-xs text-muted-foreground">
-                            {device.rssi !== null && `RSSI: ${device.rssi} dBm`}
-                            {device.rssi !== null &&
-                                device.snr !== null &&
-                                ' · '}
-                            {device.snr !== null &&
-                                `SNR: ${device.snr.toFixed(1)} dB`}
-                        </p>
-                    )}
-                    {device.hdop !== null && (
-                        <p className="font-mono text-xs text-muted-foreground">
-                            HDOP: {device.hdop.toFixed(1)}
-                        </p>
-                    )}
-                </div>
+            <Popup className="orion-popup" closeButton={false} minWidth={280}>
+                <UnitPopupContent
+                    device={device}
+                    canOpenDetails={canOpenDetails}
+                />
             </Popup>
         </Marker>
     );
