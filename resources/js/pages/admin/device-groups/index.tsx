@@ -5,6 +5,7 @@ import DeviceGroupController from '@/actions/App/Http/Controllers/Admin/DeviceGr
 import InputError from '@/components/input-error';
 import { RoleBadge } from '@/components/orion/badges';
 import type { Role } from '@/components/orion/badges';
+import { GEOFENCE_SWATCHES } from '@/components/orion/map-marker';
 import { EmptyState } from '@/components/orion/misc';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 import { index as adminDeviceGroupsIndex } from '@/routes/admin/device-groups';
 
 type GroupUser = {
@@ -144,22 +146,29 @@ function GroupFormFields({
                 <InputError message={errors.description} />
             </div>
 
-            <div className="grid gap-2">
-                <Label htmlFor="color">Group Color</Label>
-                <div className="flex items-center gap-3">
-                    <input
-                        id="color"
-                        type="color"
-                        value={values.color}
-                        onChange={(e) => onChange('color', e.target.value)}
-                        className="h-9 w-14 cursor-pointer rounded border p-0.5"
-                    />
-                    <span className="font-mono text-sm text-muted-foreground">
-                        {values.color}
-                    </span>
+            <fieldset className="grid gap-2">
+                <legend className="mb-2 text-sm font-medium">
+                    Group colour
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                    {GEOFENCE_SWATCHES.map((hex) => (
+                        <button
+                            key={hex}
+                            type="button"
+                            aria-label={`Colour ${hex}`}
+                            aria-pressed={values.color === hex}
+                            onClick={() => onChange('color', hex)}
+                            className={cn(
+                                'size-8 rounded-full ring-offset-2 ring-offset-background focus-visible:outline-2 focus-visible:outline-ring',
+                                values.color === hex &&
+                                    'ring-2 ring-foreground',
+                            )}
+                            style={{ background: hex }}
+                        />
+                    ))}
                 </div>
                 <InputError message={errors.color} />
-            </div>
+            </fieldset>
 
             {/* Devices */}
             <div className="grid gap-2">
@@ -262,7 +271,7 @@ function CreateGroupDialog({
         name: '',
         location: '',
         description: '',
-        color: '#3b82f6',
+        color: GEOFENCE_SWATCHES[4],
         user_ids: [] as number[],
         device_ids: [] as number[],
     });

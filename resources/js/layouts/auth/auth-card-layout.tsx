@@ -15,7 +15,7 @@ export default function AuthCardLayout({
     description?: string;
 }>) {
     return (
-        <div className="relative min-h-svh overflow-hidden bg-background md:flex md:items-center md:justify-center md:p-10">
+        <main className="relative min-h-svh overflow-hidden bg-background md:flex md:items-center md:justify-center md:p-10">
             <div
                 aria-hidden
                 style={{ backgroundImage: 'url(/images/orion/contour-bg.png)' }}
@@ -67,6 +67,6 @@ export default function AuthCardLayout({
                     {children}
                 </div>
             </div>
-        </div>
+        </main>
     );
 }

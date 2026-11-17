@@ -24,6 +24,10 @@ type ComboboxProps = {
     className?: string;
     /** Width of the popover content. Defaults to trigger width. */
     popoverWidth?: string;
+    /** Trigger id, for <Label htmlFor>. */
+    id?: string;
+    /** Accessible name when there is no visible label. */
+    'aria-label'?: string;
 };
 
 export function Combobox({
@@ -36,6 +40,8 @@ export function Combobox({
     disabled = false,
     className,
     popoverWidth,
+    id,
+    'aria-label': ariaLabel,
 }: ComboboxProps) {
     const [open, setOpen] = React.useState(false);
     const triggerRef = React.useRef<HTMLButtonElement>(null);
@@ -48,6 +54,8 @@ export function Combobox({
                 <Button
                     ref={triggerRef}
                     variant="outline"
+                    id={id}
+                    aria-label={ariaLabel}
                     role="combobox"
                     aria-expanded={open}
                     disabled={disabled}

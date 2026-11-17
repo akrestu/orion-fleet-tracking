@@ -22,7 +22,14 @@ import {
     RefreshCw,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    useId,
+} from 'react';
 import {
     MapContainer,
     Marker,
@@ -249,14 +256,21 @@ function FilterBar({
     onApply: () => void;
     loading: boolean;
 }) {
+    const uid = useId();
     const hasFilters =
         devEui !== 'all' || dateFrom !== firstOfMonth || dateTo !== today;
 
     return (
         <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">Device</Label>
+                <Label
+                    htmlFor={`${uid}-device`}
+                    className="text-xs text-muted-foreground"
+                >
+                    Device
+                </Label>
                 <Combobox
+                    id={`${uid}-device`}
                     className="w-52"
                     value={devEui}
                     onValueChange={(v) => onDevEuiChange(v || 'all')}
@@ -273,10 +287,14 @@ function FilterBar({
             </div>
 
             <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">
+                <Label
+                    htmlFor={`${uid}-from`}
+                    className="text-xs text-muted-foreground"
+                >
                     From date
                 </Label>
                 <Input
+                    id={`${uid}-from`}
                     type="date"
                     value={dateFrom}
                     onChange={(e) => onDateFromChange(e.target.value)}
@@ -285,8 +303,14 @@ function FilterBar({
             </div>
 
             <div className="flex flex-col gap-1">
-                <Label className="text-xs text-muted-foreground">To date</Label>
+                <Label
+                    htmlFor={`${uid}-to`}
+                    className="text-xs text-muted-foreground"
+                >
+                    To date
+                </Label>
                 <Input
+                    id={`${uid}-to`}
                     type="date"
                     value={dateTo}
                     onChange={(e) => onDateToChange(e.target.value)}
@@ -1156,7 +1180,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                 </Button>
             ),
             cell: ({ row }) => (
-                <span className="text-online tabular-nums">
+                <span className="tabular-nums">
                     {row.original.running_hours} h
                 </span>
             ),
@@ -1185,7 +1209,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                         : 0;
 
                 return (
-                    <span className="text-warning tabular-nums">
+                    <span className="text-muted-foreground tabular-nums">
                         {row.original.idle_hours} h
                         {pct > 0 && (
                             <span className="ml-1 text-xs opacity-70">
@@ -1306,7 +1330,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription>Running Hours</CardDescription>
-                            <CardTitle className="text-2xl text-online tabular-nums">
+                            <CardTitle className="text-2xl tabular-nums">
                                 {totalRunning.toFixed(1)} h
                             </CardTitle>
                         </CardHeader>
@@ -1314,7 +1338,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription>Idle Hours</CardDescription>
-                            <CardTitle className="text-2xl text-warning tabular-nums">
+                            <CardTitle className="text-2xl text-muted-foreground tabular-nums">
                                 {totalIdle.toFixed(1)} h
                                 {totalHours > 0 && (
                                     <span className="ml-1 text-sm font-normal opacity-70">
@@ -2634,7 +2658,7 @@ function DelayWaitingTab({ devices }: { devices: DeviceOption[] }) {
                                         <TableCell className="tabular-nums">
                                             {s.waiting_count}
                                         </TableCell>
-                                        <TableCell className="text-warning tabular-nums">
+                                        <TableCell className="tabular-nums">
                                             {formatMin(s.waiting_min)}
                                         </TableCell>
                                         <TableCell className="tabular-nums">

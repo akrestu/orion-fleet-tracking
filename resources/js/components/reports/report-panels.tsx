@@ -591,8 +591,9 @@ export function QuickExport({
             </p>
 
             <div className="mt-4 grid gap-1.5">
-                <Label>Devices</Label>
+                <Label htmlFor="quick-export-device">Devices</Label>
                 <Combobox
+                    id="quick-export-device"
                     value={devEui}
                     onValueChange={(v) => onDevEuiChange(v || 'all')}
                     placeholder={`All devices (${devices.length})`}
