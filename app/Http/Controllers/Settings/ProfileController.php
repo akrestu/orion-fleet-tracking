@@ -21,9 +21,27 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        /** @var User $user */
+        $user = $request->user();
+
         return Inertia::render('settings/profile', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'groups' => $user->isAdmin() ? null : $user->deviceGroups()->orderBy('name')->pluck('name'),
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+        ]);
+    }
+
+    /**
+     * Mobile "Akun" hub: profile card plus links to the settings pages.
+     */
+    public function account(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return Inertia::render('settings/account', [
+            'twoFactorEnabled' => $user->two_factor_confirmed_at !== null,
+            'passkeyCount' => $user->passkeys()->count(),
         ]);
     }
 

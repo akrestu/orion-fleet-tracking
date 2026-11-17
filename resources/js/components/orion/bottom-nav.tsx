@@ -2,11 +2,10 @@ import { Link, usePage } from '@inertiajs/react';
 import { Bell, Cpu, House, Map, UserRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { dashboard } from '@/routes';
+import { dashboard, account } from '@/routes';
 import adminAlerts from '@/routes/admin/alerts';
 import adminDevices from '@/routes/admin/devices';
 import fleet from '@/routes/fleet';
-import profile from '@/routes/profile';
 import type { Auth } from '@/types';
 
 /**
@@ -45,7 +44,7 @@ const ITEMS: Item[] = [
     {
         key: 'account',
         label: 'Akun',
-        href: profile.edit.url(),
+        href: account.url(),
         icon: UserRound,
     },
 ];

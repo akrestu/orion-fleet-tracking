@@ -18,7 +18,18 @@ trait ProfileValidationRules
         return [
             'name' => $this->nameRules(),
             'email' => $this->emailRules($userId),
+            'phone' => $this->phoneRules(),
         ];
+    }
+
+    /**
+     * WhatsApp phone: optional, digits with an optional leading + and spaces/dashes.
+     *
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function phoneRules(): array
+    {
+        return ['nullable', 'string', 'max:20', 'regex:/^\+?[0-9][0-9 \-]{6,18}$/'];
     }
 
     /**

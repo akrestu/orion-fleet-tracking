@@ -1,77 +1,95 @@
-import { Link } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { ChevronLeft, LogOut, Moon, Shield, UserRound } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
-import Heading from '@/components/heading';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { RoleBadge } from '@/components/orion/badges';
+import type { Role } from '@/components/orion/badges';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
+import { account, logout } from '@/routes';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
-import type { NavItem } from '@/types';
+import type { Auth } from '@/types';
 
-const sidebarNavItems: NavItem[] = [
-    {
-        title: 'Profile',
-        href: edit(),
-        icon: null,
-    },
-    {
-        title: 'Security',
-        href: editSecurity(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
-        icon: null,
-    },
+const NAV = [
+    { title: 'Profile', href: edit(), icon: UserRound },
+    { title: 'Security', href: editSecurity(), icon: Shield },
+    { title: 'Appearance', href: editAppearance(), icon: Moon },
 ];
 
+export function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('');
+}
+
+/** Account settings shell: user card + sub-nav on desktop, back-to-Akun link on mobile. */
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const user = auth.user;
 
     return (
-        <div className="px-4 py-6">
-            <Heading
-                title="Settings"
-                description="Manage your profile and account settings"
-            />
+        <div className="flex flex-col gap-6 p-4 md:flex-row md:gap-10 md:p-7">
+            <Link
+                href={account()}
+                className="-ml-1 inline-flex min-h-11 items-center gap-1 self-start text-sm text-muted-foreground md:hidden"
+            >
+                <ChevronLeft className="size-4" /> Akun
+            </Link>
 
-            <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
-                    <nav
-                        className="flex flex-col space-y-1 space-x-0"
-                        aria-label="Settings"
-                    >
-                        {sidebarNavItems.map((item, index) => (
-                            <Button
-                                key={`${toUrl(item.href)}-${index}`}
-                                size="sm"
-                                variant="ghost"
-                                asChild
-                                className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
-                                })}
-                            >
-                                <Link href={item.href}>
-                                    {item.icon && (
-                                        <item.icon className="h-4 w-4" />
-                                    )}
-                                    {item.title}
-                                </Link>
-                            </Button>
-                        ))}
-                    </nav>
-                </aside>
-
-                <Separator className="my-6 lg:hidden" />
-
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
-                        {children}
-                    </section>
+            <aside className="hidden w-60 shrink-0 md:block">
+                <div className="flex items-center gap-3 px-2 pb-6">
+                    <span className="grid size-11 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-accent-foreground">
+                        {initials(user.name)}
+                    </span>
+                    <span className="min-w-0">
+                        <span className="block truncate font-semibold">
+                            {user.name}
+                        </span>
+                        <RoleBadge
+                            role={user.role as Role}
+                            className="mt-0.5"
+                        />
+                    </span>
                 </div>
+                <nav className="flex flex-col gap-1" aria-label="Account">
+                    {NAV.map((item) => {
+                        const active = isCurrentOrParentUrl(item.href);
+
+                        return (
+                            <Link
+                                key={toUrl(item.href)}
+                                href={item.href}
+                                aria-current={active ? 'page' : undefined}
+                                className={cn(
+                                    'flex h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring',
+                                    active && 'bg-muted font-semibold',
+                                )}
+                            >
+                                <item.icon className="size-4" />
+                                {item.title}
+                            </Link>
+                        );
+                    })}
+                </nav>
+                <button
+                    type="button"
+                    onClick={() => {
+                        router.flushAll();
+                        router.post(logout());
+                    }}
+                    className="mt-6 flex h-10 w-full items-center gap-3 rounded-lg px-3 text-sm text-danger hover:bg-danger-bg focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                    <LogOut className="size-4" /> Log out
+                </button>
+            </aside>
+
+            <div className="flex max-w-3xl min-w-0 flex-1 flex-col gap-6">
+                {children}
             </div>
         </div>
     );

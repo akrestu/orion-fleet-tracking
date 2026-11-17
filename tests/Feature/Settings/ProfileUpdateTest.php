@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\DeviceGroup;
 use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();
@@ -82,4 +84,38 @@ test('correct password must be provided to delete account', function () {
         ->assertRedirect(route('profile.edit'));
 
     expect($user->fresh())->not->toBeNull();
+});
+
+test('whatsapp phone can be saved and must look like a phone number', function () {
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->patch(route('profile.update'), ['name' => $user->name, 'email' => $user->email, 'phone' => '+62 812-3456-7890'])
+        ->assertSessionHasNoErrors();
+    expect($user->fresh()->phone)->toBe('+62 812-3456-7890');
+
+    $this->actingAs($user)
+        ->patch(route('profile.update'), ['name' => $user->name, 'email' => $user->email, 'phone' => 'call me'])
+        ->assertSessionHasErrors('phone');
+});
+
+test('profile page lists the operator groups', function () {
+    $user = User::factory()->operator()->create();
+    $user->deviceGroups()->attach(DeviceGroup::factory()->create(['name' => 'Pit Utara']));
+
+    $this->actingAs($user)
+        ->get(route('profile.edit'))
+        ->assertInertia(fn (Assert $page) => $page->where('groups', ['Pit Utara']));
+});
+
+test('account hub shows security summary', function () {
+    $user = User::factory()->create(['two_factor_confirmed_at' => now()]);
+
+    $this->actingAs($user)
+        ->get(route('account'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('settings/account')
+            ->where('twoFactorEnabled', true)
+            ->where('passkeyCount', 0));
 });

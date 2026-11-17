@@ -101,7 +101,8 @@
   .animate-live-pulse { animation: none; }
 }
 
-:root {
+:root,
+.light {
   --radius: 8px;
 
   --background: oklch(0.985 0.002 250);
