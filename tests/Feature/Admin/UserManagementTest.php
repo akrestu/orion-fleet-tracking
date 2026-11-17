@@ -42,6 +42,7 @@ it('admin can create a new user', function () {
     $this->actingAs($this->admin)
         ->post('/admin/users', [
             'name' => 'New User',
+            'unique_id' => 'WBK-0101',
             'email' => 'newuser@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
@@ -50,6 +51,7 @@ it('admin can create a new user', function () {
         ->assertRedirect();
 
     $this->assertDatabaseHas('users', [
+        'unique_id' => 'WBK-0101',
         'email' => 'newuser@example.com',
         'role' => UserRole::Operator->value,
     ]);
@@ -61,12 +63,41 @@ it('rejects creating a user with duplicate email', function () {
     $this->actingAs($this->admin)
         ->post('/admin/users', [
             'name' => 'Duplicate',
+            'unique_id' => 'WBK-0102',
             'email' => 'taken@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
             'role' => UserRole::Viewer->value,
         ])
         ->assertSessionHasErrors('email');
+});
+
+it('rejects creating a user with a duplicate unique id', function () {
+    User::factory()->create(['unique_id' => 'WBK-0200']);
+
+    $this->actingAs($this->admin)
+        ->post('/admin/users', [
+            'name' => 'Duplicate ID',
+            'unique_id' => 'WBK-0200',
+            'email' => 'dup-id@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'role' => UserRole::Viewer->value,
+        ])
+        ->assertSessionHasErrors('unique_id');
+});
+
+it('rejects a unique id with spaces or symbols', function () {
+    $this->actingAs($this->admin)
+        ->post('/admin/users', [
+            'name' => 'Bad ID',
+            'unique_id' => 'WBK 01/02',
+            'email' => 'bad-id@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'role' => UserRole::Viewer->value,
+        ])
+        ->assertSessionHasErrors('unique_id');
 });
 
 // --- Update user ---
@@ -77,12 +108,28 @@ it('admin can update a user role', function () {
     $this->actingAs($this->admin)
         ->put("/admin/users/{$target->id}", [
             'name' => $target->name,
+            'unique_id' => $target->unique_id,
             'email' => $target->email,
             'role' => UserRole::Operator->value,
         ])
         ->assertRedirect();
 
     expect($target->fresh()->role)->toBe(UserRole::Operator);
+});
+
+it('admin can change a user unique id', function () {
+    $target = User::factory()->create();
+
+    $this->actingAs($this->admin)
+        ->put("/admin/users/{$target->id}", [
+            'name' => $target->name,
+            'unique_id' => 'WBK-0300',
+            'email' => $target->email,
+            'role' => $target->role->value,
+        ])
+        ->assertRedirect();
+
+    expect($target->fresh()->unique_id)->toBe('WBK-0300');
 });
 
 // --- Delete user ---

@@ -1,16 +1,12 @@
 import { Form, Head } from '@inertiajs/react';
-import { CheckCircle } from 'lucide-react';
-import InputError from '@/components/input-error';
+import { CheckCircle2, IdCard, Lock } from 'lucide-react';
+import { AuthField } from '@/components/orion/auth-field';
 import PasskeyVerify from '@/components/passkey-verify';
-import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { register } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
 
@@ -22,89 +18,105 @@ type Props = {
 export default function Login({ status, canResetPassword }: Props) {
     return (
         <>
-            <Head title="Log in" />
-
-            <PasskeyVerify />
+            <Head title="Masuk" />
 
             {status && (
-                <Alert className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-                    <CheckCircle className="h-4 w-4 !text-emerald-400" />
-                    <AlertDescription className="text-emerald-400">{status}</AlertDescription>
-                </Alert>
+                <div
+                    role="status"
+                    className="mb-5 flex items-center gap-2 rounded-xl bg-online-bg px-4 py-3 text-sm text-online"
+                >
+                    <CheckCircle2 className="size-4 shrink-0" />
+                    {status}
+                </div>
             )}
 
             <Form
                 {...store.form()}
                 resetOnSuccess={['password']}
-                className="flex flex-col gap-6"
+                className="flex flex-col gap-5"
             >
                 {({ processing, errors }) => (
                     <>
-                        <div className="grid gap-5">
-                            <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    required
-                                    autoFocus
-                                    tabIndex={1}
-                                    autoComplete="email"
-                                    placeholder="email@example.com"
+                        <AuthField
+                            id="unique_id"
+                            name="unique_id"
+                            label="Unique ID"
+                            icon={IdCard}
+                            required
+                            autoFocus
+                            autoComplete="username"
+                            autoCapitalize="characters"
+                            spellCheck={false}
+                            placeholder="mis. WBK-0457"
+                            error={errors.unique_id}
+                        />
+
+                        <AuthField
+                            id="password"
+                            name="password"
+                            type="password"
+                            label="Kata sandi"
+                            icon={Lock}
+                            required
+                            autoComplete="current-password"
+                            placeholder="Kata sandi"
+                            error={errors.password}
+                        />
+
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2.5">
+                                <Checkbox
+                                    id="remember"
+                                    name="remember"
+                                    className="size-5"
                                 />
-                                <InputError message={errors.email} />
+                                <Label
+                                    htmlFor="remember"
+                                    className="font-normal"
+                                >
+                                    Ingat perangkat ini
+                                </Label>
                             </div>
-
-                            <div className="grid gap-2">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
-                                    {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="ml-auto text-sm"
-                                            tabIndex={5}
-                                        >
-                                            Forgot password?
-                                        </TextLink>
-                                    )}
-                                </div>
-                                <PasswordInput
-                                    id="password"
-                                    name="password"
-                                    required
-                                    tabIndex={2}
-                                    autoComplete="current-password"
-                                    placeholder="Password"
-                                />
-                                <InputError message={errors.password} />
-                            </div>
-
-                            <div className="flex items-center space-x-2">
-                                <Checkbox id="remember" name="remember" tabIndex={3} />
-                                <Label htmlFor="remember" className="font-normal">Remember me</Label>
-                            </div>
-
-                            <Button type="submit" className="w-full" tabIndex={4} disabled={processing}>
-                                {processing && <Spinner />}
-                                Log in
-                            </Button>
+                            {canResetPassword && (
+                                <TextLink
+                                    href={request()}
+                                    className="text-sm font-medium"
+                                >
+                                    Lupa kata sandi?
+                                </TextLink>
+                            )}
                         </div>
 
-                        <p className="text-muted-foreground text-center text-sm">
-                            Don't have an account?{' '}
-                            <TextLink href={register()} tabIndex={6}>
-                                Sign up
-                            </TextLink>
-                        </p>
+                        <Button
+                            type="submit"
+                            disabled={processing}
+                            className="h-14 rounded-full bg-foreground text-base font-semibold text-background hover:bg-foreground/90"
+                        >
+                            {processing && <Spinner />}
+                            Masuk
+                        </Button>
                     </>
                 )}
             </Form>
+
+            <div className="mt-4">
+                <PasskeyVerify
+                    label="Masuk dengan passkey"
+                    loadingLabel="Mengautentikasi…"
+                    showSeparator={false}
+                    buttonClassName="h-14 rounded-full text-base font-medium"
+                />
+            </div>
+
+            <p className="mt-6 text-sm text-muted-foreground">
+                Belum punya akun atau Unique ID terkunci? Hubungi admin site
+                Anda.
+            </p>
         </>
     );
 }
 
 Login.layout = {
-    title: 'Welcome back',
-    description: 'Sign in to your ORION fleet dashboard',
+    title: 'Masuk ke ORION',
+    description: 'Gunakan Unique ID dan kata sandi Anda.',
 };

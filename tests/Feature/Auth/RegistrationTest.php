@@ -19,12 +19,13 @@ test('registration screen can be rendered', function () {
 test('new users can register', function () {
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
+        'unique_id' => 'WBK-2001',
         'email' => 'test@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
     ]);
 
-    expect(User::where('email', 'test@example.com')->exists())->toBeTrue();
+    expect(User::where('unique_id', 'WBK-2001')->where('email', 'test@example.com')->exists())->toBeTrue();
     $this->assertAuthenticated();
     $response->assertRedirect('/dashboard');
 });

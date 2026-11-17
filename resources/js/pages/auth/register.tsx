@@ -45,6 +45,20 @@ export default function Register({ passwordRules }: Props) {
                             </div>
 
                             <div className="grid gap-2">
+                                <Label htmlFor="unique_id">Unique ID</Label>
+                                <Input
+                                    id="unique_id"
+                                    type="text"
+                                    required
+                                    autoComplete="username"
+                                    name="unique_id"
+                                    spellCheck={false}
+                                    placeholder="mis. WBK-0457"
+                                />
+                                <InputError message={errors.unique_id} />
+                            </div>
+
+                            <div className="grid gap-2">
                                 <Label htmlFor="email">Email address</Label>
                                 <Input
                                     id="email"

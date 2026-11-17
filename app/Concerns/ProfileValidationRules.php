@@ -32,6 +32,25 @@ trait ProfileValidationRules
     }
 
     /**
+     * Get the validation rules for the Unique ID used to log in
+     * (letters, digits, dot, dash, underscore; e.g. WBK-0457 or 2210457).
+     *
+     * @return array<int, ValidationRule|array<mixed>|string>
+     */
+    protected function uniqueIdRules(?int $userId = null): array
+    {
+        return [
+            'required',
+            'string',
+            'max:32',
+            'regex:/^[A-Za-z0-9._-]+$/',
+            $userId === null
+                ? Rule::unique(User::class, 'unique_id')
+                : Rule::unique(User::class, 'unique_id')->ignore($userId),
+        ];
+    }
+
+    /**
      * Get the validation rules used to validate user emails.
      *
      * @return array<int, ValidationRule|array<mixed>|string>

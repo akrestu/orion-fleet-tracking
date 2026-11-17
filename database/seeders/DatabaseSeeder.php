@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'admin@orion.local'],
             [
                 'name' => 'ORION Admin',
+                'unique_id' => 'ORN-ADMIN',
                 'password' => Hash::make('password'),
                 'role' => UserRole::Admin,
                 'email_verified_at' => now(),
@@ -29,6 +30,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'operator@orion.local'],
             [
                 'name' => 'ORION Operator',
+                'unique_id' => 'ORN-OPERATOR',
                 'password' => Hash::make('password'),
                 'role' => UserRole::Operator,
                 'email_verified_at' => now(),
@@ -39,6 +41,7 @@ class DatabaseSeeder extends Seeder
             ['email' => 'viewer@orion.local'],
             [
                 'name' => 'ORION Viewer',
+                'unique_id' => 'ORN-VIEWER',
                 'password' => Hash::make('password'),
                 'role' => UserRole::Viewer,
                 'email_verified_at' => now(),

@@ -20,12 +20,13 @@ class UserController extends Controller
     {
         $users = User::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'role', 'created_at']);
+            ->get(['id', 'name', 'unique_id', 'email', 'role', 'created_at']);
 
         return Inertia::render('admin/users/index', [
             'users' => $users->map(fn (User $user) => [
                 'id' => $user->id,
                 'name' => $user->name,
+                'unique_id' => $user->unique_id,
                 'email' => $user->email,
                 'role' => $user->role->value,
                 'role_label' => $user->role->label(),
@@ -42,6 +43,7 @@ class UserController extends Controller
     {
         User::create([
             'name' => $request->validated('name'),
+            'unique_id' => $request->validated('unique_id'),
             'email' => $request->validated('email'),
             'password' => Hash::make($request->validated('password')),
             'role' => UserRole::from($request->validated('role')),
@@ -65,6 +67,7 @@ class UserController extends Controller
 
                 $user->update([
                     'name' => $request->validated('name'),
+                    'unique_id' => $request->validated('unique_id'),
                     'email' => $request->validated('email'),
                     'role' => $newRole,
                 ]);
@@ -81,6 +84,7 @@ class UserController extends Controller
 
         $user->update([
             'name' => $request->validated('name'),
+            'unique_id' => $request->validated('unique_id'),
             'email' => $request->validated('email'),
             'role' => $newRole,
         ]);

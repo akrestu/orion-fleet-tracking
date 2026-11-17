@@ -42,6 +42,7 @@ type UserRole = 'admin' | 'operator' | 'viewer';
 type AdminUser = {
     id: number;
     name: string;
+    unique_id: string;
     email: string;
     role: UserRole;
     role_label: string;
@@ -75,6 +76,7 @@ function UserFormFields({
     errors: Partial<Record<string, string>>;
     values: {
         name: string;
+        unique_id: string;
         email: string;
         role: string;
         password?: string;
@@ -101,6 +103,23 @@ function UserFormFields({
                     autoComplete="off"
                 />
                 <InputError message={errors.name} />
+            </div>
+
+            <div className="grid gap-2">
+                <Label htmlFor="unique_id">Unique ID</Label>
+                <Input
+                    id="unique_id"
+                    value={values.unique_id}
+                    onChange={(e) => onChange('unique_id', e.target.value)}
+                    placeholder="e.g. WBK-0457"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="font-mono"
+                />
+                <p className="text-xs text-muted-foreground">
+                    Used to sign in. Letters, numbers, dot, dash or underscore.
+                </p>
+                <InputError message={errors.unique_id} />
             </div>
 
             <div className="grid gap-2">
@@ -174,6 +193,7 @@ function CreateUserDialog({ roles }: { roles: RoleOption[] }) {
 
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
+        unique_id: '',
         email: '',
         role: 'viewer',
         password: '',
@@ -265,6 +285,7 @@ function EditUserDialog({
 
     const { data, setData, put, processing, errors, reset } = useForm({
         name: user.name,
+        unique_id: user.unique_id,
         email: user.email,
         role: user.role,
     });
@@ -286,6 +307,7 @@ function EditUserDialog({
                 onClick={() => {
                     setData({
                         name: user.name,
+                        unique_id: user.unique_id,
                         email: user.email,
                         role: user.role,
                     });
@@ -579,6 +601,15 @@ export default function UsersIndex({
             ),
         },
         {
+            accessorKey: 'unique_id',
+            header: 'Unique ID',
+            cell: ({ row }) => (
+                <span className="font-mono text-xs">
+                    {row.original.unique_id}
+                </span>
+            ),
+        },
+        {
             accessorKey: 'email',
             header: 'Email',
         },
@@ -659,7 +690,7 @@ export default function UsersIndex({
                 <div className="flex flex-col gap-4">
                     <div className="flex items-center gap-3">
                         <Input
-                            placeholder="Search by name or email..."
+                            placeholder="Search by name, Unique ID or email..."
                             value={globalFilter}
                             onChange={(e) => setGlobalFilter(e.target.value)}
                             className="max-w-sm"
