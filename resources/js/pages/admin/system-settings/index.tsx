@@ -6,9 +6,10 @@ import {
     useReactTable,
 } from '@tanstack/react-table';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Copy, KeyRound, Plus, Server, Shield, Trash2 } from 'lucide-react';
+import { KeyRound, Plus, Server, Shield } from 'lucide-react';
 import { useState } from 'react';
 import InputError from '@/components/input-error';
+import { SecretReveal } from '@/components/orion/misc';
 import { Badge } from '@/components/ui/badge';
 import type { BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -246,35 +247,16 @@ function NewTokenBanner({
     token: string;
     onDismiss: () => void;
 }) {
-    const [copied, setCopied] = useState(false);
-
-    const copy = () => {
-        navigator.clipboard.writeText(token);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
     return (
-        <div className="space-y-2 rounded-lg border border-warning/30 bg-warning-bg p-4">
-            <p className="text-sm font-medium text-warning">
-                Copy your new API token now — it won't be shown again.
-            </p>
-            <div className="flex items-center gap-2">
-                <code className="flex-1 rounded border bg-background px-3 py-2 font-mono text-xs break-all">
-                    {token}
-                </code>
-                <Button size="sm" variant="outline" onClick={copy}>
-                    <Copy className="mr-1 h-3.5 w-3.5" />
-                    {copied ? 'Copied!' : 'Copy'}
-                </Button>
-            </div>
+        <div className="grid gap-2">
+            <SecretReveal secret={token} />
             <Button
                 size="sm"
                 variant="ghost"
-                className="text-xs text-muted-foreground"
+                className="justify-self-start text-xs text-muted-foreground"
                 onClick={onDismiss}
             >
-                Dismiss
+                I’ve stored it — dismiss
             </Button>
         </div>
     );
@@ -447,13 +429,13 @@ function DeleteTokenDialog({ token }: { token: ApiToken }) {
     return (
         <>
             <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
+                variant="outline"
+                size="sm"
+                className="border-danger/40 text-danger hover:bg-danger-bg hover:text-danger"
                 onClick={() => setOpen(true)}
+                aria-label={`Revoke ${token.name}`}
             >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Revoke {token.name}</span>
+                Revoke
             </Button>
 
             <Dialog open={open} onOpenChange={setOpen}>
@@ -829,19 +811,18 @@ export default function SystemSettingsIndex({
         <>
             <Head title="System Settings" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
+            <div className="flex flex-col gap-5 p-4 md:p-7">
                 <div>
-                    <h1 className="text-xl font-semibold tracking-tight">
+                    <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
                         System Settings
                     </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Configure MQTT, manage API tokens, and review the audit
-                        log.
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Integrations, access tokens and audit trail.
                     </p>
                 </div>
 
                 <Tabs defaultValue="mqtt">
-                    <TabsList>
+                    <TabsList className="h-11 w-fit [&>button]:min-h-9 [&>button]:px-4">
                         <TabsTrigger value="mqtt" className="gap-1.5">
                             <Server className="h-4 w-4" />
                             MQTT

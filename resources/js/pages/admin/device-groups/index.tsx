@@ -1,11 +1,13 @@
 import { Head, useForm } from '@inertiajs/react';
-import { FolderOpen, Layers, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Layers, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import DeviceGroupController from '@/actions/App/Http/Controllers/Admin/DeviceGroupController';
 import InputError from '@/components/input-error';
+import { RoleBadge } from '@/components/orion/badges';
+import type { Role } from '@/components/orion/badges';
+import { EmptyState } from '@/components/orion/misc';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -18,14 +20,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
 import { index as adminDeviceGroupsIndex } from '@/routes/admin/device-groups';
 
 type GroupUser = {
@@ -58,12 +52,6 @@ type PageProps = {
     ungroupedCount: number;
     operators: GroupUser[];
     allDevices: GroupDevice[];
-};
-
-const ROLE_BADGE: Record<string, string> = {
-    admin: 'bg-violet-500/15 text-violet-400 border-violet-500/20',
-    operator: 'bg-sky-500/15 text-sky-400 border-sky-500/20',
-    viewer: 'bg-slate-500/15 text-slate-400 border-slate-500/20',
 };
 
 // ── Group form fields ─────────────────────────────────────────────────────────
@@ -244,12 +232,10 @@ function GroupFormFields({
                                     <span className="text-xs text-muted-foreground">
                                         {u.email}
                                     </span>
-                                    <Badge
-                                        variant="outline"
-                                        className={`ml-auto text-xs ${ROLE_BADGE[u.role]}`}
-                                    >
-                                        {u.role}
-                                    </Badge>
+                                    <RoleBadge
+                                        role={u.role as Role}
+                                        className="ml-auto"
+                                    />
                                 </Label>
                             </div>
                         ))}
@@ -526,6 +512,17 @@ function DeleteGroupDialog({ group }: { group: DeviceGroup }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('');
+}
+
+const MAX_AVATARS = 4;
+
 export default function DeviceGroupsIndex({
     groups,
     ungroupedCount,
@@ -536,15 +533,22 @@ export default function DeviceGroupsIndex({
         <>
             <Head title="Device Groups" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-5 p-4 md:p-7">
+                <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
+                        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
                             Device Groups
                         </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Organise devices by site or project and control
-                            operator access per group.
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Groups scope what operators and viewers can see.
+                            {ungroupedCount > 0 && (
+                                <span className="text-warning">
+                                    {' '}
+                                    {ungroupedCount} device
+                                    {ungroupedCount === 1 ? ' is' : 's are'} not
+                                    in any group.
+                                </span>
+                            )}
                         </p>
                     </div>
                     <CreateGroupDialog
@@ -553,169 +557,91 @@ export default function DeviceGroupsIndex({
                     />
                 </div>
 
-                {/* Summary cards */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                        Total Groups
-                                    </p>
-                                    <p className="mt-1 text-3xl font-bold">
-                                        {groups.length}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-muted p-2">
-                                    <Layers className="h-5 w-5 text-muted-foreground" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                        Grouped Devices
-                                    </p>
-                                    <p className="mt-1 text-3xl font-bold text-online">
-                                        {groups.reduce(
-                                            (sum, g) => sum + g.devices_count,
-                                            0,
-                                        )}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-online-bg p-2">
-                                    <FolderOpen className="h-5 w-5 text-online" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                        Ungrouped Devices
-                                    </p>
-                                    <p className="mt-1 text-3xl font-bold text-warning">
-                                        {ungroupedCount}
-                                    </p>
-                                </div>
-                                <div className="rounded-lg bg-warning-bg p-2">
-                                    <FolderOpen className="h-5 w-5 text-warning" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                {groups.length === 0 ? (
+                    <div className="rounded-xl border bg-card">
+                        <EmptyState
+                            icon={<Layers className="size-6" />}
+                            title="No groups yet"
+                        >
+                            Create a group per site or pit, then assign
+                            operators and viewers to it.
+                        </EmptyState>
+                    </div>
+                ) : (
+                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+                        {groups.map((group) => {
+                            const extra = group.users.length - MAX_AVATARS;
 
-                {/* Groups table */}
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                            <Layers className="h-4 w-4 text-muted-foreground" />
-                            All Groups
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {groups.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Layers className="mb-2 h-10 w-10 text-muted-foreground/40" />
-                                <p className="text-sm font-medium text-muted-foreground">
-                                    No groups yet
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground/60">
-                                    Create a group to organise your fleet by
-                                    site or project.
-                                </p>
-                            </div>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Group</TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead>Devices</TableHead>
-                                        <TableHead>Access</TableHead>
-                                        <TableHead />
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {groups.map((group) => (
-                                        <TableRow key={group.id}>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
+                            return (
+                                <article
+                                    key={group.id}
+                                    className="flex flex-col rounded-xl border border-t-4 bg-card"
+                                    style={{ borderTopColor: group.color }}
+                                >
+                                    <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
+                                        <div className="min-w-0">
+                                            <h2 className="truncate font-semibold">
+                                                {group.name}
+                                            </h2>
+                                            <p className="mt-0.5 flex items-center gap-1 truncate text-sm text-muted-foreground">
+                                                <MapPin
+                                                    className="size-3.5 shrink-0"
+                                                    aria-hidden
+                                                />
+                                                {group.location ??
+                                                    group.description ??
+                                                    'No location'}
+                                            </p>
+                                        </div>
+                                        <p className="shrink-0 text-right">
+                                            <span className="text-2xl font-semibold tabular-nums">
+                                                {group.devices_count}
+                                            </span>{' '}
+                                            <span className="text-sm text-muted-foreground">
+                                                units
+                                            </span>
+                                        </p>
+                                    </div>
+                                    <div className="mx-5 flex items-center justify-between gap-3 border-t py-3">
+                                        <span className="flex -space-x-1.5">
+                                            {group.users
+                                                .slice(0, MAX_AVATARS)
+                                                .map((u) => (
                                                     <span
-                                                        className="inline-block h-3 w-3 flex-shrink-0 rounded-full"
-                                                        style={{
-                                                            backgroundColor:
-                                                                group.color,
-                                                        }}
-                                                    />
-                                                    <span className="font-medium">
-                                                        {group.name}
+                                                        key={u.id}
+                                                        title={u.name}
+                                                        className="grid size-8 place-items-center rounded-full bg-accent text-[11px] font-semibold text-accent-foreground ring-2 ring-card"
+                                                    >
+                                                        {initials(u.name)}
                                                     </span>
-                                                </div>
-                                                {group.description && (
-                                                    <p className="mt-0.5 ml-5 text-xs text-muted-foreground">
-                                                        {group.description}
-                                                    </p>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">
-                                                {group.location ?? '—'}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant="outline">
-                                                    {group.devices_count} device
-                                                    {group.devices_count !== 1
-                                                        ? 's'
-                                                        : ''}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {group.users.length === 0 ? (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        No restriction
-                                                    </span>
-                                                ) : (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {group.users.map(
-                                                            (u) => (
-                                                                <Badge
-                                                                    key={u.id}
-                                                                    variant="outline"
-                                                                    className={`text-xs ${ROLE_BADGE[u.role]}`}
-                                                                >
-                                                                    <Users className="mr-1 h-3 w-3" />
-                                                                    {u.name}
-                                                                </Badge>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <EditGroupDialog
-                                                        group={group}
-                                                        operators={operators}
-                                                        allDevices={allDevices}
-                                                    />
-                                                    <DeleteGroupDialog
-                                                        group={group}
-                                                    />
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
+                                                ))}
+                                            {extra > 0 && (
+                                                <span className="grid size-8 place-items-center rounded-full bg-muted text-[11px] font-semibold ring-2 ring-card">
+                                                    +{extra}
+                                                </span>
+                                            )}
+                                        </span>
+                                        <span className="text-sm text-muted-foreground tabular-nums">
+                                            {group.users.length} user
+                                            {group.users.length === 1
+                                                ? ''
+                                                : 's'}{' '}
+                                            assigned
+                                        </span>
+                                    </div>
+                                    <div className="mt-auto flex justify-end gap-1 border-t px-3 py-2">
+                                        <EditGroupDialog
+                                            group={group}
+                                            operators={operators}
+                                            allDevices={allDevices}
+                                        />
+                                        <DeleteGroupDialog group={group} />
+                                    </div>
+                                </article>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </>
     );

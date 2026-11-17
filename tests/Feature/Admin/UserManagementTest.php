@@ -1,7 +1,9 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\DeviceGroup;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -206,4 +208,27 @@ it('operator cannot reset a user password', function () {
             'password_confirmation' => 'newpassword123',
         ])
         ->assertForbidden();
+});
+
+it('lists each user with groups, 2FA status and last activity', function () {
+    $admin = User::factory()->admin()->create(['name' => 'Aaron Admin', 'two_factor_confirmed_at' => now()]);
+    $operator = User::factory()->operator()->create(['name' => 'Zed Operator']);
+    $operator->deviceGroups()->attach(DeviceGroup::factory()->create(['name' => 'Pit Utara']));
+    DB::table('sessions')->insert([
+        'id' => 'sess-1',
+        'user_id' => $operator->id,
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'test',
+        'payload' => '',
+        'last_activity' => now()->subMinutes(4)->timestamp,
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('admin.users.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('users', fn ($users) => ($a = collect($users)->firstWhere('id', $admin->id))['two_factor_enabled'] === true
+                && $a['groups'] === []
+                && ($o = collect($users)->firstWhere('id', $operator->id))['groups'] === ['Pit Utara']
+                && $o['two_factor_enabled'] === false
+                && $o['last_active_at'] !== null));
 });

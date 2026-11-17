@@ -1,18 +1,10 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import {
-    flexRender,
-    getCoreRowModel,
-    getFilteredRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
-    useReactTable,
-} from '@tanstack/react-table';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import { ArrowUpDown, KeyRound, Pencil, Plus, Trash2 } from 'lucide-react';
+import { KeyRound, Pencil, Plus, Search, SearchX, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import UserController from '@/actions/App/Http/Controllers/Admin/UserController';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
+import { RoleBadge } from '@/components/orion/badges';
+import { EmptyState, LastSeen } from '@/components/orion/misc';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import type { ComboboxOption } from '@/components/ui/combobox';
@@ -26,14 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import { index as adminUsersIndex } from '@/routes/admin/users';
 import type { Auth } from '@/types';
 
@@ -47,6 +32,9 @@ type AdminUser = {
     role: UserRole;
     role_label: string;
     created_at: string;
+    groups: string[];
+    two_factor_enabled: boolean;
+    last_active_at: string | null;
 };
 
 type RoleOption = {
@@ -60,11 +48,22 @@ type PageProps = {
     roles: RoleOption[];
 };
 
-const ROLE_BADGE: Record<UserRole, string> = {
-    admin: 'bg-violet-500/15 text-violet-400 border-violet-500/20',
-    operator: 'bg-sky-500/15 text-sky-400 border-sky-500/20',
-    viewer: 'bg-slate-500/15 text-slate-400 border-slate-500/20',
+const ROLE_DESCRIPTION: Record<UserRole, string> = {
+    admin: 'Full access: users, devices, alerts, settings.',
+    operator: 'Monitors dashboard & map, resolves alerts in assigned groups.',
+    viewer: 'Read-only access to assigned groups.',
 };
+const ROLES: UserRole[] = ['admin', 'operator', 'viewer'];
+const NEVER_STALE = Number.MAX_SAFE_INTEGER;
+
+function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join('');
+}
 
 function UserFormFields({
     errors,
@@ -562,6 +561,33 @@ function DeleteUserDialog({
     );
 }
 
+function GroupChips({ user }: { user: AdminUser }) {
+    if (user.role === 'admin') {
+        return (
+            <span className="rounded-md bg-muted px-2 py-0.5 text-xs">
+                All groups
+            </span>
+        );
+    }
+
+    if (user.groups.length === 0) {
+        return <span className="text-xs text-warning">No group</span>;
+    }
+
+    return (
+        <>
+            {user.groups.map((g) => (
+                <span
+                    key={g}
+                    className="rounded-md bg-muted px-2 py-0.5 text-xs whitespace-nowrap"
+                >
+                    {g}
+                </span>
+            ))}
+        </>
+    );
+}
+
 export default function UsersIndex({
     users,
     roles,
@@ -570,219 +596,188 @@ export default function UsersIndex({
     roles: RoleOption[];
 }) {
     const { auth } = usePage<PageProps>().props;
-    const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState('');
-    const [roleFilter, setRoleFilter] = useState('all');
+    const [search, setSearch] = useState('');
+    const [roleFilter, setRoleFilter] = useState<UserRole | null>(null);
 
-    const roleFilterOptions: ComboboxOption[] = [
-        { value: 'all', label: 'All roles' },
-        ...roles.map((r) => ({ value: r.value, label: r.label })),
-    ];
-
-    const filteredUsers =
-        roleFilter === 'all'
-            ? users
-            : users.filter((u) => u.role === roleFilter);
-
-    const columns: ColumnDef<AdminUser>[] = [
-        {
-            accessorKey: 'name',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
-                    }
-                >
-                    Name
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            ),
-        },
-        {
-            accessorKey: 'unique_id',
-            header: 'Unique ID',
-            cell: ({ row }) => (
-                <span className="font-mono text-xs">
-                    {row.original.unique_id}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'email',
-            header: 'Email',
-        },
-        {
-            accessorKey: 'role',
-            header: 'Role',
-            cell: ({ row }) => {
-                const role = row.original.role;
-
-                return (
-                    <Badge variant="outline" className={ROLE_BADGE[role]}>
-                        {row.original.role_label}
-                    </Badge>
-                );
-            },
-        },
-        {
-            accessorKey: 'created_at',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
-                    }
-                >
-                    Joined
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            ),
-        },
-        {
-            id: 'actions',
-            header: '',
-            cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-1">
-                    <ResetPasswordDialog user={row.original} />
-                    <EditUserDialog user={row.original} roles={roles} />
-                    <DeleteUserDialog
-                        user={row.original}
-                        currentUserId={auth.user.id}
-                    />
-                </div>
-            ),
-        },
-    ];
-
-    const table = useReactTable({
-        data: filteredUsers,
-        columns,
-        state: { sorting, globalFilter },
-        onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        initialState: { pagination: { pageSize: 20 } },
-    });
+    const counts = Object.fromEntries(
+        ROLES.map((r) => [r, users.filter((u) => u.role === r).length]),
+    ) as Record<UserRole, number>;
+    const needle = search.trim().toLowerCase();
+    const visible = users.filter(
+        (u) =>
+            (roleFilter === null || u.role === roleFilter) &&
+            (needle === '' ||
+                u.name.toLowerCase().includes(needle) ||
+                u.email.toLowerCase().includes(needle) ||
+                u.unique_id.toLowerCase().includes(needle)),
+    );
 
     return (
         <>
             <Head title="User Management" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-5 p-4 md:p-7">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
+                        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
                             User Management
                         </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage system users and their roles.
+                        <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                            {users.length} users · {counts.admin} admins ·{' '}
+                            {counts.operator} operators · {counts.viewer}{' '}
+                            viewers
                         </p>
                     </div>
-                    <CreateUserDialog roles={roles} />
+                    <div className="flex gap-2">
+                        <label className="relative block flex-1 md:w-72">
+                            <span className="sr-only">Search users</span>
+                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                type="search"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search users…"
+                                className="h-11 pl-9 md:h-10"
+                            />
+                        </label>
+                        <CreateUserDialog roles={roles} />
+                    </div>
                 </div>
 
-                <div className="flex flex-col gap-4">
-                    <div className="flex items-center gap-3">
-                        <Input
-                            placeholder="Search by name, Unique ID or email..."
-                            value={globalFilter}
-                            onChange={(e) => setGlobalFilter(e.target.value)}
-                            className="max-w-sm"
-                        />
-                        <Combobox
-                            options={roleFilterOptions}
-                            value={roleFilter}
-                            onValueChange={(v) => setRoleFilter(v || 'all')}
-                            placeholder="Filter by role"
-                            searchPlaceholder="Search role..."
-                            className="w-44"
-                        />
-                    </div>
-
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                {table.getHeaderGroups().map((headerGroup) => (
-                                    <TableRow key={headerGroup.id}>
-                                        {headerGroup.headers.map((header) => (
-                                            <TableHead key={header.id}>
-                                                {header.isPlaceholder
-                                                    ? null
-                                                    : flexRender(
-                                                          header.column
-                                                              .columnDef.header,
-                                                          header.getContext(),
-                                                      )}
-                                            </TableHead>
-                                        ))}
-                                    </TableRow>
-                                ))}
-                            </TableHeader>
-                            <TableBody>
-                                {table.getRowModel().rows.length ? (
-                                    table.getRowModel().rows.map((row) => (
-                                        <TableRow key={row.id}>
-                                            {row
-                                                .getVisibleCells()
-                                                .map((cell) => (
-                                                    <TableCell key={cell.id}>
-                                                        {flexRender(
-                                                            cell.column
-                                                                .columnDef.cell,
-                                                            cell.getContext(),
-                                                        )}
-                                                    </TableCell>
-                                                ))}
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={columns.length}
-                                            className="h-24 text-center text-muted-foreground"
-                                        >
-                                            No users found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>
-                            {table.getFilteredRowModel().rows.length} user(s)
-                            total
-                        </span>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
-                            >
-                                Previous
-                            </Button>
-                            <span>
-                                Page {table.getState().pagination.pageIndex + 1}{' '}
-                                of {table.getPageCount()}
+                <div className="grid gap-4 md:grid-cols-3">
+                    {ROLES.map((role) => (
+                        <button
+                            key={role}
+                            type="button"
+                            aria-pressed={roleFilter === role}
+                            onClick={() =>
+                                setRoleFilter((r) => (r === role ? null : role))
+                            }
+                            className="flex flex-col justify-start rounded-xl border bg-card p-5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring aria-pressed:border-primary/50"
+                        >
+                            <span className="flex items-center justify-between">
+                                <RoleBadge role={role} />
+                                <span className="text-2xl font-semibold tabular-nums">
+                                    {counts[role]}
+                                </span>
                             </span>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
-                            >
-                                Next
-                            </Button>
+                            <span className="mt-3 block text-sm text-muted-foreground">
+                                {ROLE_DESCRIPTION[role]}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+
+                <div className="overflow-hidden rounded-xl border bg-card">
+                    {visible.length === 0 ? (
+                        <EmptyState
+                            icon={<SearchX className="size-6" />}
+                            title="No users match"
+                        >
+                            Try another name, email or role.
+                        </EmptyState>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-sidebar text-left text-muted-foreground">
+                                    <tr className="h-[38px] [&>th]:px-4 [&>th]:font-medium [&>th]:whitespace-nowrap">
+                                        <th className="pl-5!">User</th>
+                                        <th>Unique ID</th>
+                                        <th>Role</th>
+                                        <th>Groups</th>
+                                        <th>2FA</th>
+                                        <th>Last active</th>
+                                        <th>
+                                            <span className="sr-only">
+                                                Actions
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {visible.map((user) => (
+                                        <tr
+                                            key={user.id}
+                                            className="h-16 border-t [&>td]:px-4"
+                                        >
+                                            <td className="pl-5!">
+                                                <span className="flex items-center gap-3">
+                                                    <span
+                                                        aria-hidden
+                                                        className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground"
+                                                    >
+                                                        {initials(user.name)}
+                                                    </span>
+                                                    <span className="min-w-0">
+                                                        <span className="block truncate font-semibold">
+                                                            {user.name}
+                                                        </span>
+                                                        <span className="block truncate text-xs text-muted-foreground">
+                                                            {user.email}
+                                                        </span>
+                                                    </span>
+                                                </span>
+                                            </td>
+                                            <td className="font-mono text-xs whitespace-nowrap">
+                                                {user.unique_id}
+                                            </td>
+                                            <td>
+                                                <RoleBadge role={user.role} />
+                                            </td>
+                                            <td>
+                                                <span className="flex flex-wrap gap-1.5">
+                                                    <GroupChips user={user} />
+                                                </span>
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    'font-medium whitespace-nowrap',
+                                                    user.two_factor_enabled
+                                                        ? 'text-online'
+                                                        : 'text-warning',
+                                                )}
+                                            >
+                                                {user.two_factor_enabled
+                                                    ? 'Enabled'
+                                                    : 'Not set'}
+                                            </td>
+                                            <td className="whitespace-nowrap">
+                                                {user.last_active_at ? (
+                                                    <LastSeen
+                                                        at={user.last_active_at}
+                                                        staleAfterSec={
+                                                            NEVER_STALE
+                                                        }
+                                                    />
+                                                ) : (
+                                                    <span className="text-muted-foreground">
+                                                        Never
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="pr-4! text-right">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <ResetPasswordDialog
+                                                        user={user}
+                                                    />
+                                                    <EditUserDialog
+                                                        user={user}
+                                                        roles={roles}
+                                                    />
+                                                    <DeleteUserDialog
+                                                        user={user}
+                                                        currentUserId={
+                                                            auth.user.id
+                                                        }
+                                                    />
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
+                    )}
                 </div>
             </div>
         </>

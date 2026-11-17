@@ -9,6 +9,7 @@ use App\Http\Requests\Admin\ResetUserPasswordRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
@@ -20,7 +21,18 @@ class UserController extends Controller
     {
         $users = User::query()
             ->orderBy('name')
-            ->get(['id', 'name', 'unique_id', 'email', 'role', 'created_at']);
+            ->with('deviceGroups:id,name')
+            ->get(['id', 'name', 'unique_id', 'email', 'role', 'created_at', 'two_factor_confirmed_at']);
+
+        // Latest session activity per user (database session driver); unix timestamps.
+        /** @var array<int, int> $lastActive */
+        $lastActive = DB::table('sessions')
+            ->whereNotNull('user_id')
+            ->selectRaw('user_id, MAX(last_activity) as last_activity')
+            ->groupBy('user_id')
+            ->pluck('last_activity', 'user_id')
+            ->map(fn ($ts) => (int) $ts)
+            ->all();
 
         return Inertia::render('admin/users/index', [
             'users' => $users->map(fn (User $user) => [
@@ -31,6 +43,11 @@ class UserController extends Controller
                 'role' => $user->role->value,
                 'role_label' => $user->role->label(),
                 'created_at' => $user->created_at?->toDateString(),
+                'groups' => $user->deviceGroups->pluck('name')->all(),
+                'two_factor_enabled' => $user->two_factor_confirmed_at !== null,
+                'last_active_at' => isset($lastActive[$user->id])
+                    ? Carbon::createFromTimestamp($lastActive[$user->id])->toIso8601String()
+                    : null,
             ]),
             'roles' => collect(UserRole::cases())->map(fn (UserRole $role) => [
                 'value' => $role->value,
