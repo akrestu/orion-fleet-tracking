@@ -1,397 +1,492 @@
-import { Head, Link } from '@inertiajs/react';
-import {
-    flexRender,
-    getCoreRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
-    useReactTable,
-} from '@tanstack/react-table';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import { ArrowLeft, ArrowUpDown } from 'lucide-react';
-import { useState } from 'react';
-import { UnitIcon } from '@/components/orion/unit-icon';
-import { Badge, StatusBadge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import { unitMeta } from '@/lib/orion/unit-types';
-import { index as adminDevicesIndex } from '@/routes/admin/devices';
-import type { UnitCategory } from '@/types/fleet';
+import 'leaflet/dist/leaflet.css';
 
-type AdminDevice = {
-    id: number;
-    dev_eui: string;
-    join_eui: string | null;
-    application_id: string;
-    device_name: string;
-    unit_type: UnitCategory;
-    unit_model: string | null;
-    is_active: boolean;
-    status: 'online' | 'offline';
-    last_seen_at: string | null;
+import { Deferred, Head, Link } from '@inertiajs/react';
+import L from 'leaflet';
+import { Download, Map as MapIcon } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
+import { DeviceDialog } from '@/components/admin/device-form-dialog';
+import type {
+    AdminDevice,
+    DeviceGroupRef,
+} from '@/components/admin/device-form-dialog';
+import { Segmented } from '@/components/Fleet/map-overlays';
+import { RouteHistoryLayer } from '@/components/Fleet/RouteHistoryLayer';
+import { ConditionBadge, StatusBadge } from '@/components/orion/badges';
+import { unitMarkerIcon } from '@/components/orion/map-marker';
+import { LastSeen } from '@/components/orion/misc';
+import { UnitIcon } from '@/components/orion/unit-icon';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAppearance } from '@/hooks/use-appearance';
+import { useRouteHistory } from '@/hooks/useRouteHistory';
+import type { TimeRange } from '@/hooks/useRouteHistory';
+import { toUnitType, unitMeta } from '@/lib/orion/unit-types';
+import { cn } from '@/lib/utils';
+import { index as adminDevicesIndex } from '@/routes/admin/devices';
+import { gpsLogs as exportGpsLogs } from '@/routes/admin/reports/export';
+import fleet from '@/routes/fleet';
+
+type DeviceDetail = AdminDevice & {
+    group_name: string | null;
+    last_gateway: string | null;
+    created_at: string | null;
 };
 
 type GpsLogRow = {
-    recorded_at: string | null;
-    latitude: number | null;
-    longitude: number | null;
+    recorded_at: string;
+    latitude: number;
+    longitude: number;
     speed_kmh: number | null;
     heading_deg: number | null;
     rssi: number | null;
     snr: number | null;
     satellites: number | null;
     hdop: number | null;
+    gateway_id: string | null;
+};
+
+type DeviceStats = {
+    distance_km: number | null;
+    running_hours: number | null;
+    idle_hours: number | null;
+    cycles: number;
+    avg_cycle_min: number | null;
+    alerts: number;
 };
 
 type PageProps = {
-    device: AdminDevice;
+    device: DeviceDetail;
     gpsLogs: GpsLogRow[];
+    overspeedThreshold: number | null;
+    stats?: DeviceStats;
+    groups: DeviceGroupRef[];
 };
 
-function DeviceInfoCard({ device }: { device: AdminDevice }) {
-    const cat = unitMeta(device.unit_type);
+const ROUTE_RANGES: TimeRange[] = ['1h', '3h', '6h', '24h'];
+const LOG_ROWS = 50;
+const dash = '—';
 
+/** 24 h WIB clock, e.g. 14:32:48. */
+function formatTime(iso: string): string {
+    return new Date(iso).toLocaleTimeString('en-GB', {
+        timeZone: 'Asia/Jakarta',
+        hour12: false,
+    });
+}
+
+function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Jakarta',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-base">Device Info</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-                    <div>
-                        <dt className="text-muted-foreground">Device EUI</dt>
-                        <dd className="font-mono font-medium">
-                            {device.dev_eui}
-                        </dd>
-                    </div>
-                    {device.join_eui && (
-                        <div>
-                            <dt className="text-muted-foreground">Join EUI</dt>
-                            <dd className="font-mono">{device.join_eui}</dd>
-                        </div>
-                    )}
-                    <div>
-                        <dt className="text-muted-foreground">
-                            Application ID
-                        </dt>
-                        <dd>{device.application_id}</dd>
-                    </div>
-                    <div>
-                        <dt className="text-muted-foreground">Category</dt>
-                        <dd>
-                            <span className="inline-flex items-center gap-2">
-                                <UnitIcon type={cat.key} size={22} />
-                                {cat.label}
-                            </span>
-                        </dd>
-                    </div>
-                    {device.unit_model && (
-                        <div>
-                            <dt className="text-muted-foreground">Model</dt>
-                            <dd>{device.unit_model}</dd>
-                        </div>
-                    )}
-                    <div>
-                        <dt className="text-muted-foreground">Status</dt>
-                        <dd>
-                            <StatusBadge status={device.status} />
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-muted-foreground">Active</dt>
-                        <dd>
-                            <Badge
-                                variant={
-                                    device.is_active ? 'online' : 'offline'
-                                }
-                            >
-                                {device.is_active ? 'Yes' : 'No'}
-                            </Badge>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt className="text-muted-foreground">Last Seen</dt>
-                        <dd>{device.last_seen_at ?? '—'}</dd>
-                    </div>
-                </dl>
-            </CardContent>
-        </Card>
+        <div className="rounded-xl border bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums md:text-2xl">
+                {value}
+            </p>
+        </div>
     );
 }
 
-function GpsHistoryTable({ gpsLogs }: { gpsLogs: GpsLogRow[] }) {
-    const [sorting, setSorting] = useState<SortingState>([]);
+function StatTiles({
+    speedNow,
+    stats,
+}: {
+    speedNow: string;
+    stats: DeviceStats;
+}) {
+    const hours = (h: number | null) => (h === null ? dash : `${h} h`);
 
-    const columns: ColumnDef<GpsLogRow>[] = [
-        {
-            accessorKey: 'recorded_at',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
-                    }
-                >
-                    Time
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            ),
-            cell: ({ row }) => (
-                <span className="text-sm tabular-nums">
-                    {row.original.recorded_at ?? '—'}
-                </span>
-            ),
-        },
-        {
-            id: 'coordinates',
-            header: 'Coordinates',
-            cell: ({ row }) => {
-                const { latitude: lat, longitude: lng } = row.original;
-
-                if (lat == null || lng == null) {
-                    return <span className="text-muted-foreground">—</span>;
+    return (
+        <>
+            <StatTile label="Speed now" value={speedNow} />
+            <StatTile
+                label="Distance today"
+                value={
+                    stats.distance_km === null
+                        ? dash
+                        : `${stats.distance_km} km`
                 }
+            />
+            <StatTile
+                label="Running / idle"
+                value={`${hours(stats.running_hours)} / ${hours(stats.idle_hours)}`}
+            />
+            <StatTile label="Cycles today" value={String(stats.cycles)} />
+            <StatTile
+                label="Avg cycle time"
+                value={
+                    stats.avg_cycle_min === null
+                        ? dash
+                        : `${Math.round(stats.avg_cycle_min)} min`
+                }
+            />
+            <StatTile label="Alerts today" value={String(stats.alerts)} />
+        </>
+    );
+}
 
-                return (
-                    <span className="font-mono text-xs tabular-nums">
-                        {lat.toFixed(6)}, {lng.toFixed(6)}
-                    </span>
-                );
-            },
-        },
+/** Keeps the mini-map framed on the route (or the unit when there is no route yet). */
+function FitRoute({
+    points,
+    fallback,
+}: {
+    points: [number, number][];
+    fallback: [number, number];
+}) {
+    const map = useMap();
+    const [lat, lng] = fallback;
+
+    useEffect(() => {
+        if (points.length >= 2) {
+            map.fitBounds(L.latLngBounds(points), {
+                padding: [32, 32],
+                maxZoom: 18,
+            });
+        } else {
+            map.setView([lat, lng], 17);
+        }
+    }, [map, points, lat, lng]);
+
+    return null;
+}
+
+function RouteCard({
+    device,
+    latest,
+}: {
+    device: DeviceDetail;
+    latest: GpsLogRow | undefined;
+}) {
+    const [range, setRange] = useState<TimeRange>('3h');
+    const { points, loading } = useRouteHistory(device.dev_eui, range);
+    const { resolvedAppearance } = useAppearance();
+    const routeLatLngs = useMemo(
+        () => points.map((p) => [p.latitude, p.longitude] as [number, number]),
+        [points],
+    );
+    const icon = useMemo(
+        () =>
+            unitMarkerIcon({
+                type: toUnitType(device.unit_type),
+                status: device.status,
+                heading: latest?.heading_deg,
+                dark: resolvedAppearance === 'dark',
+                size: 34,
+            }),
+        [device.unit_type, device.status, latest, resolvedAppearance],
+    );
+
+    return (
+        <section className="flex min-h-[360px] flex-col overflow-hidden rounded-xl border bg-card">
+            <div className="flex items-center justify-between gap-3 px-5 py-3">
+                <h2 className="font-semibold">
+                    Route · last {range.replace('h', ' h')}
+                    {loading && <span className="sr-only"> (memuat)</span>}
+                </h2>
+                <Segmented
+                    label="Rentang riwayat rute"
+                    value={range}
+                    onChange={setRange}
+                    options={ROUTE_RANGES.map((r) => ({ value: r, label: r }))}
+                />
+            </div>
+            <div className="relative isolate min-h-[300px] flex-1 bg-muted">
+                {latest ? (
+                    <MapContainer
+                        center={[latest.latitude, latest.longitude]}
+                        zoom={17}
+                        zoomControl={false}
+                        attributionControl={false}
+                        style={{ position: 'absolute', inset: 0 }}
+                    >
+                        <TileLayer
+                            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                            maxZoom={19}
+                        />
+                        <FitRoute
+                            points={routeLatLngs}
+                            fallback={[latest.latitude, latest.longitude]}
+                        />
+                        <RouteHistoryLayer points={points} />
+                        <Marker
+                            position={[latest.latitude, latest.longitude]}
+                            icon={icon}
+                        />
+                    </MapContainer>
+                ) : (
+                    <p className="grid h-full place-items-center p-6 text-sm text-muted-foreground">
+                        Belum ada posisi GPS untuk unit ini.
+                    </p>
+                )}
+            </div>
+        </section>
+    );
+}
+
+export default function DeviceShow({
+    device,
+    gpsLogs,
+    overspeedThreshold,
+    stats,
+    groups,
+}: PageProps) {
+    const [editing, setEditing] = useState(false);
+    const cat = unitMeta(device.unit_type);
+    const online = device.status === 'online';
+    const latest = gpsLogs[0];
+    const speedNow =
+        online && latest?.speed_kmh != null
+            ? `${latest.speed_kmh.toFixed(1)} km/h`
+            : dash;
+    const isOver = (kmh: number | null) =>
+        kmh !== null && overspeedThreshold !== null && kmh > overspeedThreshold;
+
+    const info: { label: string; value: ReactNode; mono?: boolean }[] = [
+        { label: 'Device EUI', value: device.dev_eui, mono: true },
+        { label: 'Category', value: cat.label },
+        { label: 'Model', value: device.unit_model ?? dash },
+        { label: 'Group / site', value: device.group_name ?? dash },
         {
-            accessorKey: 'speed_kmh',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
-                    }
-                >
-                    Speed
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
+            label: 'Condition',
+            value: (
+                <span className="capitalize">{device.operational_status}</span>
             ),
-            cell: ({ row }) => {
-                const v = row.original.speed_kmh;
-
-                return (
-                    <span className="tabular-nums">
-                        {v != null ? `${v.toFixed(1)} km/h` : '—'}
-                    </span>
-                );
-            },
+        },
+        { label: 'Active', value: device.is_active ? 'Yes' : 'No' },
+        {
+            label: 'Last gateway',
+            value: device.last_gateway ?? dash,
+            mono: true,
         },
         {
-            accessorKey: 'heading_deg',
-            header: 'Heading',
-            cell: ({ row }) => {
-                const v = row.original.heading_deg;
-
-                return (
-                    <span className="tabular-nums">
-                        {v != null ? `${v.toFixed(0)}°` : '—'}
-                    </span>
-                );
-            },
-        },
-        {
-            accessorKey: 'rssi',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
-                    }
-                >
-                    RSSI
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            ),
-            cell: ({ row }) => {
-                const v = row.original.rssi;
-
-                return (
-                    <span className="tabular-nums">
-                        {v != null ? `${v} dBm` : '—'}
-                    </span>
-                );
-            },
-        },
-        {
-            accessorKey: 'snr',
-            header: 'SNR',
-            cell: ({ row }) => {
-                const v = row.original.snr;
-
-                return (
-                    <span className="tabular-nums">
-                        {v != null ? `${v.toFixed(1)} dB` : '—'}
-                    </span>
-                );
-            },
-        },
-        {
-            accessorKey: 'satellites',
-            header: 'Sats',
-            cell: ({ row }) => (
-                <span className="tabular-nums">
-                    {row.original.satellites ?? '—'}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'hdop',
-            header: 'HDOP',
-            cell: ({ row }) => {
-                const v = row.original.hdop;
-
-                return (
-                    <span className="tabular-nums">
-                        {v != null ? v.toFixed(2) : '—'}
-                    </span>
-                );
-            },
+            label: 'Registered',
+            value: device.created_at ? formatDate(device.created_at) : dash,
         },
     ];
 
-    const table = useReactTable({
-        data: gpsLogs,
-        columns,
-        state: { sorting },
-        onSortingChange: setSorting,
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        initialState: { pagination: { pageSize: 25 } },
-    });
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-base">
-                    GPS History{' '}
-                    <span className="text-sm font-normal text-muted-foreground">
-                        (last {gpsLogs.length} records)
-                    </span>
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-                <div className="rounded-b-md border-t">
-                    <Table>
-                        <TableHeader>
-                            {table.getHeaderGroups().map((hg) => (
-                                <TableRow key={hg.id}>
-                                    {hg.headers.map((header) => (
-                                        <TableHead key={header.id}>
-                                            {header.isPlaceholder
-                                                ? null
-                                                : flexRender(
-                                                      header.column.columnDef
-                                                          .header,
-                                                      header.getContext(),
-                                                  )}
-                                        </TableHead>
-                                    ))}
-                                </TableRow>
-                            ))}
-                        </TableHeader>
-                        <TableBody>
-                            {table.getRowModel().rows.length ? (
-                                table.getRowModel().rows.map((row, i) => (
-                                    <TableRow key={i}>
-                                        {row.getVisibleCells().map((cell) => (
-                                            <TableCell key={cell.id}>
-                                                {flexRender(
-                                                    cell.column.columnDef.cell,
-                                                    cell.getContext(),
-                                                )}
-                                            </TableCell>
-                                        ))}
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell
-                                        colSpan={columns.length}
-                                        className="h-24 text-center text-muted-foreground"
-                                    >
-                                        No GPS records found.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-
-                <div className="flex items-center justify-between px-4 py-3 text-sm text-muted-foreground">
-                    <span>{gpsLogs.length} record(s) total</span>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => table.previousPage()}
-                            disabled={!table.getCanPreviousPage()}
-                        >
-                            Previous
-                        </Button>
-                        <span>
-                            Page {table.getState().pagination.pageIndex + 1} of{' '}
-                            {table.getPageCount()}
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => table.nextPage()}
-                            disabled={!table.getCanNextPage()}
-                        >
-                            Next
-                        </Button>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
+    const [exportFrom] = useState(() =>
+        new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10),
     );
-}
 
-export default function DeviceShow({ device, gpsLogs }: PageProps) {
     return (
         <>
-            <Head title={`${device.device_name} – Device Detail`} />
+            <Head title={device.device_name} />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href={adminDevicesIndex()}>
-                            <ArrowLeft className="h-4 w-4" />
-                            <span className="sr-only">
-                                Back to Device Management
-                            </span>
-                        </Link>
-                    </Button>
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            {device.device_name}
-                        </h1>
-                        <p className="font-mono text-sm text-muted-foreground">
-                            {device.dev_eui}
-                        </p>
+            <div className="flex flex-col gap-5 p-4 md:p-7">
+                <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-4">
+                        <UnitIcon
+                            type={cat.key}
+                            variant="tile"
+                            size={64}
+                            muted={!online}
+                        />
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
+                                    {device.device_name}
+                                    {device.unit_model &&
+                                        ` ${device.unit_model}`}
+                                </h1>
+                                <StatusBadge online={online} />
+                                <ConditionBadge
+                                    condition={device.operational_status}
+                                />
+                            </div>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {[
+                                    cat.label,
+                                    device.unit_model,
+                                    device.group_name,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                {' · '}
+                                {device.last_seen_at ? (
+                                    <>
+                                        last uplink{' '}
+                                        <LastSeen at={device.last_seen_at} />
+                                    </>
+                                ) : (
+                                    'no uplink yet'
+                                )}
+                            </p>
+                        </div>
                     </div>
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            asChild
+                            className="h-11 flex-1 md:h-10 md:flex-none"
+                        >
+                            <Link
+                                href={fleet.map.url({
+                                    query: { device: device.dev_eui },
+                                })}
+                            >
+                                <MapIcon className="size-4" /> Show on map
+                            </Link>
+                        </Button>
+                        <Button
+                            onClick={() => setEditing(true)}
+                            className="h-11 flex-1 md:h-10 md:flex-none"
+                        >
+                            Edit device
+                        </Button>
+                    </div>
+                </header>
+
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+                    <Deferred
+                        data="stats"
+                        fallback={Array.from({ length: 6 }, (_, i) => (
+                            <Skeleton key={i} className="h-[76px] rounded-xl" />
+                        ))}
+                    >
+                        {stats && (
+                            <StatTiles speedNow={speedNow} stats={stats} />
+                        )}
+                    </Deferred>
                 </div>
 
-                <DeviceInfoCard device={device} />
-                <GpsHistoryTable gpsLogs={gpsLogs} />
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                    <section className="rounded-xl border bg-card px-5 py-4">
+                        <h2 className="mb-2 font-semibold">Device info</h2>
+                        <dl>
+                            {info.map((row) => (
+                                <div
+                                    key={row.label}
+                                    className="flex items-center justify-between gap-4 border-t py-3 text-sm"
+                                >
+                                    <dt className="text-muted-foreground">
+                                        {row.label}
+                                    </dt>
+                                    <dd
+                                        className={cn(
+                                            'text-right font-medium',
+                                            row.mono && 'font-mono text-xs',
+                                        )}
+                                    >
+                                        {row.value}
+                                    </dd>
+                                </div>
+                            ))}
+                        </dl>
+                    </section>
+
+                    <RouteCard device={device} latest={latest} />
+                </div>
+
+                <section className="overflow-hidden rounded-xl border bg-card">
+                    <div className="flex items-center justify-between gap-3 px-5 py-4">
+                        <h2 className="font-semibold">Recent GPS logs</h2>
+                        <a
+                            href={exportGpsLogs.url({
+                                query: {
+                                    dev_eui: device.dev_eui,
+                                    from: exportFrom,
+                                },
+                            })}
+                            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-2 hover:underline md:min-h-0"
+                        >
+                            <Download className="size-4" /> Export CSV
+                        </a>
+                    </div>
+                    {gpsLogs.length === 0 ? (
+                        <p className="border-t p-6 text-center text-sm text-muted-foreground">
+                            Belum ada log GPS.
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm whitespace-nowrap">
+                                <thead className="bg-sidebar text-muted-foreground">
+                                    <tr className="h-[38px] text-right [&>th]:px-4 [&>th]:font-medium">
+                                        <th className="pl-5! text-left">
+                                            Recorded at
+                                        </th>
+                                        <th className="text-left">
+                                            Coordinates
+                                        </th>
+                                        <th>Speed</th>
+                                        <th>Heading</th>
+                                        <th>HDOP</th>
+                                        <th>Sats</th>
+                                        <th>RSSI</th>
+                                        <th>SNR</th>
+                                        <th className="pr-5!">Gateway</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {gpsLogs.slice(0, LOG_ROWS).map((log) => (
+                                        <tr
+                                            key={log.recorded_at}
+                                            className="h-11 border-t text-right tabular-nums [&>td]:px-4"
+                                        >
+                                            <td className="pl-5! text-left">
+                                                {formatTime(log.recorded_at)}
+                                            </td>
+                                            <td className="text-left font-mono text-xs">
+                                                {log.latitude.toFixed(5)},{' '}
+                                                {log.longitude.toFixed(5)}
+                                            </td>
+                                            <td
+                                                className={cn(
+                                                    isOver(log.speed_kmh) &&
+                                                        'font-semibold text-danger',
+                                                )}
+                                            >
+                                                {log.speed_kmh === null
+                                                    ? dash
+                                                    : `${log.speed_kmh.toFixed(1)} km/h`}
+                                            </td>
+                                            <td>
+                                                {log.heading_deg === null
+                                                    ? dash
+                                                    : `${log.heading_deg}°`}
+                                            </td>
+                                            <td>
+                                                {log.hdop === null
+                                                    ? dash
+                                                    : log.hdop.toFixed(1)}
+                                            </td>
+                                            <td>{log.satellites ?? dash}</td>
+                                            <td className="font-mono text-xs">
+                                                {log.rssi === null
+                                                    ? dash
+                                                    : `${log.rssi} dBm`}
+                                            </td>
+                                            <td className="font-mono text-xs">
+                                                {log.snr === null
+                                                    ? dash
+                                                    : log.snr.toFixed(1)}
+                                            </td>
+                                            <td className="pr-5! font-mono text-xs text-muted-foreground">
+                                                {log.gateway_id ?? dash}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
             </div>
+
+            <DeviceDialog
+                device={device}
+                groups={groups}
+                open={editing}
+                onOpenChange={setEditing}
+            />
         </>
     );
 }

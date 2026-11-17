@@ -112,7 +112,10 @@ export default function FleetMap({
     const { setOpenMobile } = useSidebar();
 
     const [map, setMap] = useState<L.Map | null>(null);
-    const [selectedDevEui, setSelectedDevEui] = useState<string | null>(null);
+    // `?device={eui}` (from Device Detail → Show on map) preselects that unit.
+    const [selectedDevEui, setSelectedDevEui] = useState<string | null>(() =>
+        new URLSearchParams(window.location.search).get('device'),
+    );
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [search, setSearch] = useState('');
     const [historyTimeRange, setHistoryTimeRange] = useState<TimeRange>('3h');

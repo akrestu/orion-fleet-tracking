@@ -31,6 +31,9 @@ class Device extends Model
         'last_seen_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<DeviceGroup, $this>
+     */
     public function deviceGroup(): BelongsTo
     {
         return $this->belongsTo(DeviceGroup::class);

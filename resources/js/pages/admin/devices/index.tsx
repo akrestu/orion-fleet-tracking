@@ -1,24 +1,45 @@
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     flexRender,
     getCoreRowModel,
-    getFilteredRowModel,
     getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
 } from '@tanstack/react-table';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import { ArrowUpDown, Eye, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import type {
+    ColumnDef,
+    RowSelectionState,
+    SortingState,
+} from '@tanstack/react-table';
+import {
+    ArrowDown,
+    ArrowUp,
+    ChevronDown,
+    Eye,
+    MoreHorizontal,
+    Pencil,
+    Plus,
+    Search,
+    SearchX,
+    Trash2,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 import DeviceController from '@/actions/App/Http/Controllers/Admin/DeviceController';
-import InputError from '@/components/input-error';
+import {
+    CONDITIONS,
+    DeviceDialog,
+    updatePayload,
+} from '@/components/admin/device-form-dialog';
+import type {
+    AdminDevice,
+    DeviceGroupRef,
+    UnitCategoryMeta,
+} from '@/components/admin/device-form-dialog';
+import { ConditionBadge } from '@/components/orion/badges';
+import { EmptyState, LastSeen } from '@/components/orion/misc';
 import { UnitIcon } from '@/components/orion/unit-icon';
-import { Badge, StatusBadge } from '@/components/ui/badge';
-import type { BadgeVariant } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Combobox } from '@/components/ui/combobox';
-import type { ComboboxOption } from '@/components/ui/combobox';
 import {
     Dialog,
     DialogContent,
@@ -27,8 +48,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -36,48 +65,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import { BACKEND_UNIT_TYPES, unitMeta } from '@/lib/orion/unit-types';
+import { cn } from '@/lib/utils';
 import adminDevices, {
     index as adminDevicesIndex,
 } from '@/routes/admin/devices';
-import type { UnitCategory } from '@/types/fleet';
-
-type DeviceGroupRef = {
-    id: number;
-    name: string;
-    color: string;
-};
-
-type OperationalStatus = 'operational' | 'standby' | 'breakdown';
-
-type AdminDevice = {
-    id: number;
-    device_group_id: number | null;
-    device_group: DeviceGroupRef | null;
-    dev_eui: string;
-    join_eui: string | null;
-    application_id: string;
-    device_name: string;
-    unit_type: UnitCategory;
-    unit_model: string | null;
-    is_active: boolean;
-    operational_status: OperationalStatus;
-    status: 'online' | 'offline';
-    last_seen_at: string | null;
-};
-
-type UnitCategoryMeta = {
-    label: string;
-    models: readonly string[];
-};
 
 type PageProps = {
     devices: AdminDevice[];
@@ -85,536 +78,338 @@ type PageProps = {
     groups: DeviceGroupRef[];
 };
 
-// Operational status is a domain-specific 3-state condition, mapped onto the
-// same 4-state Orion status vocabulary (online/warning/danger) so it reads
-// with the same colors as device connectivity everywhere else in the app.
-const OPERATIONAL_STATUS_VARIANT: Record<OperationalStatus, BadgeVariant> = {
-    operational: 'online',
-    standby: 'warning',
-    breakdown: 'danger',
+type Filters = {
+    category: string;
+    group: string;
+    condition: string;
+    gps: string;
 };
 
-const OPERATIONAL_STATUS_LABEL: Record<OperationalStatus, string> = {
-    operational: 'Operational',
-    standby: 'Standby',
-    breakdown: 'Breakdown',
+const ALL = 'all';
+const NO_GROUP = 'none';
+const NO_FILTERS: Filters = {
+    category: ALL,
+    group: ALL,
+    condition: ALL,
+    gps: ALL,
 };
 
-// ── Shared form fields ───────────────────────────────────────────────────────
-
-function DeviceFormFields({
-    errors,
-    values,
-    onChange,
-    showDevEui,
-    groups,
-}: {
-    errors: Partial<Record<string, string>>;
-    values: {
-        dev_eui?: string;
-        join_eui?: string;
-        application_id: string;
-        device_name: string;
-        unit_type: string;
-        unit_model: string;
-        is_active: boolean;
-        operational_status: string;
-        device_group_id: number | null;
-    };
-    onChange: (field: string, value: string | boolean | number | null) => void;
-    showDevEui: boolean;
-    groups: DeviceGroupRef[];
-}) {
-    const { unitCategories } = usePage<PageProps>().props;
-    const unitTypeOptions: ComboboxOption[] = BACKEND_UNIT_TYPES.map(
-        (key) => ({
-            value: key,
-            label: unitCategories[key]?.label ?? unitMeta(key).label,
-            prefix: <UnitIcon type={unitMeta(key).key} size={18} />,
-        }),
-    );
-
-    const models = unitCategories[values.unit_type]?.models ?? [];
-
-    const unitModelOptions: ComboboxOption[] = models.map((m) => ({
-        value: m,
-        label: m,
-    }));
-
-    const groupOptions: ComboboxOption[] = [
-        { value: '__none__', label: '— No group —' },
-        ...groups.map((g) => ({
-            value: g.id.toString(),
-            label: g.name,
-            prefix: (
-                <span
-                    className="inline-block h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: g.color }}
-                />
-            ),
-        })),
-    ];
-
-    const handleUnitTypeChange = (v: string) => {
-        onChange('unit_type', v);
-        onChange('unit_model', '');
-    };
-
-    const handleGroupChange = (v: string) => {
-        onChange('device_group_id', v === '__none__' ? null : parseInt(v, 10));
-    };
-
-    return (
-        <div className="space-y-4">
-            {showDevEui && (
-                <div className="grid gap-2">
-                    <Label htmlFor="dev_eui">Device EUI</Label>
-                    <Input
-                        id="dev_eui"
-                        value={values.dev_eui ?? ''}
-                        onChange={(e) => onChange('dev_eui', e.target.value)}
-                        placeholder="e.g. 0004A30B001C5EBF"
-                        autoComplete="off"
-                        maxLength={16}
-                        className="font-mono"
-                    />
-                    <InputError message={errors.dev_eui} />
-                </div>
-            )}
-
-            <div className="grid gap-2">
-                <Label htmlFor="join_eui">
-                    Join EUI{' '}
-                    <span className="font-normal text-muted-foreground">
-                        (optional)
-                    </span>
-                </Label>
-                <Input
-                    id="join_eui"
-                    value={values.join_eui ?? ''}
-                    onChange={(e) => onChange('join_eui', e.target.value)}
-                    placeholder="e.g. 0000000000000000"
-                    autoComplete="off"
-                    maxLength={16}
-                    className="font-mono"
-                />
-                <InputError message={errors.join_eui} />
-            </div>
-
-            <div className="grid gap-2">
-                <Label htmlFor="device_name">Device Name</Label>
-                <Input
-                    id="device_name"
-                    value={values.device_name}
-                    onChange={(e) => onChange('device_name', e.target.value)}
-                    placeholder="e.g. Hauler Unit 01"
-                    autoComplete="off"
-                />
-                <InputError message={errors.device_name} />
-            </div>
-
-            <div className="grid gap-2">
-                <Label htmlFor="application_id">Application ID</Label>
-                <Input
-                    id="application_id"
-                    value={values.application_id}
-                    onChange={(e) => onChange('application_id', e.target.value)}
-                    placeholder="e.g. fleet-tracker"
-                    autoComplete="off"
-                />
-                <InputError message={errors.application_id} />
-            </div>
-
-            <div className="grid gap-2">
-                <Label>Category</Label>
-                <Combobox
-                    options={unitTypeOptions}
-                    value={values.unit_type}
-                    onValueChange={handleUnitTypeChange}
-                    placeholder="Select category"
-                    searchPlaceholder="Search category..."
-                />
-                <InputError message={errors.unit_type} />
-            </div>
-
-            <div className="grid gap-2">
-                <Label>
-                    Model{' '}
-                    <span className="font-normal text-muted-foreground">
-                        (optional)
-                    </span>
-                </Label>
-                {models.length > 0 ? (
-                    <>
-                        <Combobox
-                            options={unitModelOptions}
-                            value={values.unit_model}
-                            onValueChange={(v) => onChange('unit_model', v)}
-                            placeholder="Select model"
-                            searchPlaceholder="Search model..."
-                            emptyText="No preset models."
-                        />
-                        <Input
-                            value={values.unit_model}
-                            onChange={(e) =>
-                                onChange('unit_model', e.target.value)
-                            }
-                            placeholder="Or type custom model name..."
-                            autoComplete="off"
-                        />
-                    </>
-                ) : (
-                    <Input
-                        value={values.unit_model}
-                        onChange={(e) => onChange('unit_model', e.target.value)}
-                        placeholder="Model name (optional)"
-                        autoComplete="off"
-                    />
-                )}
-                <InputError message={errors.unit_model} />
-            </div>
-
-            <div className="flex items-center gap-2">
-                <Checkbox
-                    id="is_active"
-                    checked={values.is_active}
-                    onCheckedChange={(checked) =>
-                        onChange('is_active', Boolean(checked))
-                    }
-                />
-                <Label htmlFor="is_active">Active</Label>
-            </div>
-
-            <div className="grid gap-2">
-                <Label>Operational Status</Label>
-                <Select
-                    value={values.operational_status}
-                    onValueChange={(v) => onChange('operational_status', v)}
-                >
-                    <SelectTrigger>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="operational">Operational</SelectItem>
-                        <SelectItem value="standby">Standby</SelectItem>
-                        <SelectItem value="breakdown">Breakdown</SelectItem>
-                    </SelectContent>
-                </Select>
-                <InputError message={errors.operational_status} />
-                <p className="text-xs text-muted-foreground">
-                    Standby & Breakdown otomatis dikecualikan dari laporan Fleet
-                    Utilization.
-                </p>
-            </div>
-
-            {groups.length > 0 && (
-                <div className="grid gap-2">
-                    <Label>Group / Site</Label>
-                    <Combobox
-                        options={groupOptions}
-                        value={values.device_group_id?.toString() ?? '__none__'}
-                        onValueChange={handleGroupChange}
-                        placeholder="No group"
-                        searchPlaceholder="Search group..."
-                    />
-                    <InputError message={errors.device_group_id} />
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ── Dialogs ──────────────────────────────────────────────────────────────────
-
-function CreateDeviceDialog({ groups }: { groups: DeviceGroupRef[] }) {
-    const [open, setOpen] = useState(false);
-
-    const { data, setData, post, processing, errors, reset } = useForm({
-        dev_eui: '',
-        join_eui: '',
-        application_id: '',
-        device_name: '',
-        unit_type: 'oht',
-        unit_model: '',
-        is_active: true,
-        operational_status: 'operational',
-        device_group_id: null as number | null,
-    });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(DeviceController.store.url(), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setOpen(false);
-                reset();
-            },
-        });
-    };
-
-    return (
-        <>
-            <Button onClick={() => setOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Device
-            </Button>
-
-            <Dialog
-                open={open}
-                onOpenChange={(v) => {
-                    setOpen(v);
-
-                    if (!v) {
-                        reset();
-                    }
-                }}
-            >
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Add Device</DialogTitle>
-                        <DialogDescription>
-                            Register a new device in the system.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form
-                        id="create-device-form"
-                        onSubmit={handleSubmit}
-                        className="py-2"
-                    >
-                        <DeviceFormFields
-                            errors={errors}
-                            values={data}
-                            onChange={(field, value) =>
-                                setData(
-                                    field as keyof typeof data,
-                                    value as never,
-                                )
-                            }
-                            showDevEui
-                            groups={groups}
-                        />
-                    </form>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            type="button"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            form="create-device-form"
-                            disabled={processing}
-                        >
-                            Add Device
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
-    );
-}
-
-function EditDeviceDialog({
+function DeleteDeviceDialog({
     device,
-    groups,
+    onClose,
 }: {
-    device: AdminDevice;
-    groups: DeviceGroupRef[];
+    device: AdminDevice | null;
+    onClose: () => void;
 }) {
-    const [open, setOpen] = useState(false);
-
-    const { data, setData, put, processing, errors, reset } = useForm({
-        join_eui: device.join_eui ?? '',
-        application_id: device.application_id,
-        device_name: device.device_name,
-        unit_type: device.unit_type,
-        unit_model: device.unit_model ?? '',
-        is_active: device.is_active,
-        operational_status: device.operational_status,
-        device_group_id: device.device_group_id as number | null,
-    });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        put(DeviceController.update.url(device.id), {
-            preserveScroll: true,
-            onSuccess: () => setOpen(false),
-        });
-    };
-
-    return (
-        <>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => {
-                    setData({
-                        join_eui: device.join_eui ?? '',
-                        application_id: device.application_id,
-                        device_name: device.device_name,
-                        unit_type: device.unit_type,
-                        unit_model: device.unit_model ?? '',
-                        is_active: device.is_active,
-                        operational_status: device.operational_status,
-                        device_group_id: device.device_group_id as
-                            | number
-                            | null,
-                    });
-                    setOpen(true);
-                }}
-            >
-                <Pencil className="h-4 w-4" />
-                <span className="sr-only">Edit {device.device_name}</span>
-            </Button>
-
-            <Dialog
-                open={open}
-                onOpenChange={(v) => {
-                    setOpen(v);
-
-                    if (!v) {
-                        reset();
-                    }
-                }}
-            >
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Edit Device</DialogTitle>
-                        <DialogDescription>
-                            Update {device.device_name}{' '}
-                            <span className="font-mono text-xs">
-                                ({device.dev_eui})
-                            </span>
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form
-                        id={`edit-device-form-${device.id}`}
-                        onSubmit={handleSubmit}
-                        className="py-2"
-                    >
-                        <DeviceFormFields
-                            errors={errors}
-                            values={data}
-                            onChange={(field, value) =>
-                                setData(
-                                    field as keyof typeof data,
-                                    value as never,
-                                )
-                            }
-                            showDevEui={false}
-                            groups={groups}
-                        />
-                    </form>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            type="button"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            form={`edit-device-form-${device.id}`}
-                            disabled={processing}
-                        >
-                            Save Changes
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
-    );
-}
-
-function DeleteDeviceDialog({ device }: { device: AdminDevice }) {
-    const [open, setOpen] = useState(false);
-    const { delete: destroy, processing } = useForm({});
+    const [processing, setProcessing] = useState(false);
 
     const handleDelete = () => {
-        destroy(DeviceController.destroy.url(device.id), {
+        if (!device) {
+            return;
+        }
+
+        router.delete(DeviceController.destroy.url(device.id), {
             preserveScroll: true,
-            onSuccess: () => setOpen(false),
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+            onSuccess: onClose,
         });
     };
 
     return (
-        <>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={() => setOpen(true)}
-            >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Delete {device.device_name}</span>
-            </Button>
+        <Dialog
+            open={device !== null}
+            onOpenChange={(open) => !open && onClose()}
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Delete device</DialogTitle>
+                    <DialogDescription>
+                        Delete <strong>{device?.device_name}</strong>? The
+                        tracker disappears from the map, dashboard and reports.
+                        This cannot be undone.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        disabled={processing}
+                    >
+                        Delete
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Delete Device</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete{' '}
-                            <strong>{device.device_name}</strong>? This action
-                            cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleDelete}
-                            disabled={processing}
-                        >
-                            Delete
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
+// ── Toolbar & cells ──────────────────────────────────────────────────────────
+
+function FilterPill({
+    label,
+    value,
+    options,
+    onChange,
+}: {
+    label: string;
+    value: string;
+    options: { value: string; label: string }[];
+    onChange: (value: string) => void;
+}) {
+    const active = value !== ALL;
+    const current = options.find((o) => o.value === value)?.label ?? 'all';
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger
+                className={cn(
+                    'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-4 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-ring',
+                    active
+                        ? 'border-primary/30 bg-accent text-accent-foreground'
+                        : 'border-dashed hover:bg-muted',
+                )}
+            >
+                {label}: {current}
+                <ChevronDown className="size-3.5 opacity-70" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-48">
+                <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
+                    <DropdownMenuRadioItem value={ALL}>
+                        All
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuSeparator />
+                    {options.map((o) => (
+                        <DropdownMenuRadioItem key={o.value} value={o.value}>
+                            {o.label}
+                        </DropdownMenuRadioItem>
+                    ))}
+                </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+function GpsStatus({ online }: { online: boolean }) {
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center gap-1.5 text-sm whitespace-nowrap',
+                online ? 'text-online' : 'text-offline',
+            )}
+        >
+            <span
+                aria-hidden
+                className={cn(
+                    'size-1.5 rounded-full',
+                    online ? 'bg-online' : 'bg-offline',
+                )}
+            />
+            {online ? 'Online' : 'Offline'}
+        </span>
+    );
+}
+
+function DeviceActions({
+    device,
+    onEdit,
+    onDelete,
+}: {
+    device: AdminDevice;
+    onEdit: (device: AdminDevice) => void;
+    onDelete: (device: AdminDevice) => void;
+}) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger
+                aria-label={`Actions for ${device.device_name}`}
+                className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            >
+                <MoreHorizontal className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                    <Link href={adminDevices.show.url(device.id)}>
+                        <Eye /> View details
+                    </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onEdit(device)}>
+                    <Pencil /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => onDelete(device)}
+                >
+                    <Trash2 /> Delete
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+function DeviceCard({ device }: { device: AdminDevice }) {
+    const cat = unitMeta(device.unit_type);
+    const online = device.status === 'online';
+
+    return (
+        <Link
+            href={adminDevices.show.url(device.id)}
+            className="rounded-2xl border bg-card p-4 focus-visible:outline-2 focus-visible:outline-ring"
+        >
+            <div className="flex items-center gap-3">
+                <UnitIcon
+                    type={cat.key}
+                    variant="tile"
+                    size={44}
+                    muted={!online}
+                />
+                <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">
+                        {device.device_name}
+                        {device.unit_model && ` ${device.unit_model}`}
+                    </p>
+                    <p className="truncate font-mono text-xs text-muted-foreground">
+                        {device.dev_eui}
+                    </p>
+                </div>
+                <GpsStatus online={online} />
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+                <span className="truncate">
+                    {device.device_group?.name ?? 'No group'} ·{' '}
+                    {device.last_seen_at ? (
+                        <LastSeen at={device.last_seen_at} />
+                    ) : (
+                        'never'
+                    )}
+                </span>
+                <ConditionBadge condition={device.operational_status} />
+            </div>
+        </Link>
     );
 }
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
 export default function DevicesIndex({ devices, groups }: PageProps) {
-    const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState('');
+    const [sorting, setSorting] = useState<SortingState>([
+        { id: 'device_name', desc: false },
+    ]);
+    const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+    const [search, setSearch] = useState('');
+    const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+    const [pagination, setPagination] = useState({
+        pageIndex: 0,
+        pageSize: 12,
+    });
+    const [dialogDevice, setDialogDevice] = useState<AdminDevice | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [deleting, setDeleting] = useState<AdminDevice | null>(null);
+
+    const resetPage = () => setPagination((p) => ({ ...p, pageIndex: 0 }));
+    const setFilter = (key: keyof Filters) => (value: string) => {
+        setFilters((prev) => ({ ...prev, [key]: value }));
+        resetPage();
+    };
+    const hasFilters =
+        search !== '' || Object.values(filters).some((v) => v !== ALL);
+    const clearFilters = () => {
+        setSearch('');
+        setFilters(NO_FILTERS);
+        resetPage();
+    };
+
+    const openCreate = () => {
+        setDialogDevice(null);
+        setDialogOpen(true);
+    };
+    const openEdit = (device: AdminDevice) => {
+        setDialogDevice(device);
+        setDialogOpen(true);
+    };
+    const toggleActive = (device: AdminDevice, isActive: boolean) => {
+        router.put(
+            DeviceController.update.url(device.id),
+            { ...updatePayload(device), is_active: isActive },
+            { preserveScroll: true, preserveState: true },
+        );
+    };
+
+    const filtered = useMemo(() => {
+        const needle = search.trim().toLowerCase();
+
+        return devices.filter(
+            (d) =>
+                (needle === '' ||
+                    d.device_name.toLowerCase().includes(needle) ||
+                    d.dev_eui.toLowerCase().includes(needle) ||
+                    (d.unit_model ?? '').toLowerCase().includes(needle)) &&
+                (filters.category === ALL ||
+                    d.unit_type === filters.category) &&
+                (filters.group === ALL ||
+                    (filters.group === NO_GROUP
+                        ? d.device_group_id === null
+                        : String(d.device_group_id) === filters.group)) &&
+                (filters.condition === ALL ||
+                    d.operational_status === filters.condition) &&
+                (filters.gps === ALL || d.status === filters.gps),
+        );
+    }, [devices, search, filters]);
+
+    const onlineCount = devices.filter((d) => d.status === 'online').length;
+    const breakdownCount = devices.filter(
+        (d) => d.operational_status === 'breakdown',
+    ).length;
+    const categoriesInUse = BACKEND_UNIT_TYPES.filter((t) =>
+        devices.some((d) => d.unit_type === t),
+    );
 
     const columns: ColumnDef<AdminDevice>[] = [
         {
-            accessorKey: 'device_name',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
+            id: 'select',
+            enableSorting: false,
+            header: ({ table }) => (
+                <Checkbox
+                    checked={
+                        table.getIsAllPageRowsSelected() ||
+                        (table.getIsSomePageRowsSelected() && 'indeterminate')
                     }
+                    onCheckedChange={(v) =>
+                        table.toggleAllPageRowsSelected(v === true)
+                    }
+                    aria-label="Select all devices on this page"
+                />
+            ),
+            cell: ({ row }) => (
+                <Checkbox
+                    checked={row.getIsSelected()}
+                    onCheckedChange={(v) => row.toggleSelected(v === true)}
+                    aria-label={`Select ${row.original.device_name}`}
+                />
+            ),
+        },
+        {
+            accessorKey: 'device_name',
+            header: 'Device name',
+            cell: ({ row }) => (
+                <Link
+                    href={adminDevices.show.url(row.original.id)}
+                    className="font-semibold whitespace-nowrap underline-offset-2 hover:underline"
                 >
-                    Name
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
+                    {row.original.device_name}
+                    {row.original.unit_model && ` ${row.original.unit_model}`}
+                </Link>
             ),
         },
         {
             accessorKey: 'dev_eui',
             header: 'Device EUI',
             cell: ({ row }) => (
-                <span className="font-mono text-xs">
+                <span className="font-mono text-xs text-muted-foreground">
                     {row.original.dev_eui}
                 </span>
             ),
@@ -626,7 +421,7 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                 const cat = unitMeta(row.original.unit_type);
 
                 return (
-                    <span className="inline-flex items-center gap-2 text-sm">
+                    <span className="inline-flex items-center gap-2">
                         <UnitIcon type={cat.key} size={22} />
                         {cat.label}
                     </span>
@@ -636,191 +431,315 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
         {
             accessorKey: 'unit_model',
             header: 'Model',
+            cell: ({ row }) => row.original.unit_model || '—',
+        },
+        {
+            id: 'group',
+            accessorFn: (d) => d.device_group?.name ?? '',
+            header: 'Group',
+            cell: ({ row }) =>
+                row.original.device_group?.name ?? (
+                    <span className="text-muted-foreground">—</span>
+                ),
+        },
+        {
+            accessorKey: 'operational_status',
+            header: 'Condition',
             cell: ({ row }) => (
-                <span className="text-sm text-muted-foreground">
-                    {row.original.unit_model || '—'}
-                </span>
+                <ConditionBadge condition={row.original.operational_status} />
             ),
         },
         {
             accessorKey: 'status',
             header: 'GPS',
-            cell: ({ row }) => <StatusBadge status={row.original.status} />,
-        },
-        {
-            accessorKey: 'operational_status',
-            header: 'Kondisi',
-            cell: ({ row }) => {
-                const os = row.original.operational_status;
-
-                return (
-                    <Badge variant={OPERATIONAL_STATUS_VARIANT[os]}>
-                        {OPERATIONAL_STATUS_LABEL[os]}
-                    </Badge>
-                );
-            },
+            cell: ({ row }) => (
+                <GpsStatus online={row.original.status === 'online'} />
+            ),
         },
         {
             accessorKey: 'is_active',
             header: 'Active',
-            cell: ({ row }) =>
-                row.original.is_active ? (
-                    <Badge variant="online">Yes</Badge>
-                ) : (
-                    <Badge variant="offline">No</Badge>
-                ),
-        },
-        {
-            accessorKey: 'device_group',
-            header: 'Group',
-            cell: ({ row }) => {
-                const g = row.original.device_group;
-
-                if (!g) {
-                    return (
-                        <span className="text-xs text-muted-foreground">—</span>
-                    );
-                }
-
-                return (
-                    <span className="inline-flex items-center gap-1.5 text-xs font-medium">
-                        <span
-                            className="inline-block h-2 w-2 rounded-full"
-                            style={{ backgroundColor: g.color }}
-                        />
-                        {g.name}
-                    </span>
-                );
-            },
-        },
-        {
-            accessorKey: 'last_seen_at',
-            header: 'Last Seen',
             cell: ({ row }) => (
-                <span className="text-sm text-muted-foreground">
-                    {row.original.last_seen_at ?? '—'}
-                </span>
+                <Switch
+                    checked={row.original.is_active}
+                    onCheckedChange={(v) => toggleActive(row.original, v)}
+                    aria-label={`${row.original.device_name} active`}
+                />
             ),
         },
         {
+            id: 'last_seen',
+            accessorFn: (d) => d.last_seen_at ?? '',
+            header: 'Last seen',
+            cell: ({ row }) =>
+                row.original.last_seen_at ? (
+                    <LastSeen at={row.original.last_seen_at} />
+                ) : (
+                    <span className="text-muted-foreground">Never</span>
+                ),
+        },
+        {
             id: 'actions',
-            header: '',
+            enableSorting: false,
+            header: () => <span className="sr-only">Actions</span>,
             cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-1">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        asChild
-                    >
-                        <Link href={adminDevices.show.url(row.original.id)}>
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">
-                                View {row.original.device_name}
-                            </span>
-                        </Link>
-                    </Button>
-                    <EditDeviceDialog device={row.original} groups={groups} />
-                    <DeleteDeviceDialog device={row.original} />
-                </div>
+                <DeviceActions
+                    device={row.original}
+                    onEdit={openEdit}
+                    onDelete={setDeleting}
+                />
             ),
         },
     ];
 
     const table = useReactTable({
-        data: devices,
+        data: filtered,
         columns,
-        state: { sorting, globalFilter },
+        state: { sorting, rowSelection, pagination },
         onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
+        onRowSelectionChange: setRowSelection,
+        onPaginationChange: setPagination,
+        getRowId: (d) => String(d.id),
         getCoreRowModel: getCoreRowModel(),
         getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
         getPaginationRowModel: getPaginationRowModel(),
-        initialState: { pagination: { pageSize: 20 } },
     });
+
+    const { pageIndex, pageSize } = pagination;
+    const firstRow = filtered.length === 0 ? 0 : pageIndex * pageSize + 1;
+    const lastRow = Math.min(filtered.length, (pageIndex + 1) * pageSize);
+    const selectedCount = Object.keys(rowSelection).length;
+
+    const noResults = (
+        <EmptyState
+            icon={<SearchX className="size-6" />}
+            title={search ? `No devices match “${search}”` : 'No devices match'}
+            actions={
+                hasFilters && (
+                    <Button variant="outline" onClick={clearFilters}>
+                        Clear filters
+                    </Button>
+                )
+            }
+        >
+            Try another name, EUI or filter.
+        </EmptyState>
+    );
 
     return (
         <>
             <Head title="Device Management" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-5 p-4 md:p-7">
+                <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            Device Management
+                        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
+                            <span className="md:hidden">Devices</span>
+                            <span className="hidden md:inline">
+                                Device Management
+                            </span>
                         </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage registered tracking devices.
+                        <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                            {devices.length} trackers · {onlineCount} online ·{' '}
+                            {breakdownCount} breakdown
                         </p>
                     </div>
-                    <CreateDeviceDialog groups={groups} />
+                    <Button
+                        onClick={openCreate}
+                        className="size-11 md:h-10 md:w-auto"
+                        aria-label="Add device"
+                    >
+                        <Plus className="size-4" />
+                        <span className="hidden md:inline">Add device</span>
+                    </Button>
                 </div>
 
-                <div className="flex flex-col gap-4">
-                    <Input
-                        placeholder="Search by name, EUI, model..."
-                        value={globalFilter}
-                        onChange={(e) => setGlobalFilter(e.target.value)}
-                        className="max-w-sm"
-                    />
+                <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
+                    <label className="relative block md:w-80">
+                        <span className="sr-only">Search name or EUI</span>
+                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                resetPage();
+                            }}
+                            placeholder="Search name or EUI…"
+                            className="h-11 pl-9 md:h-10"
+                        />
+                    </label>
+                    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+                        <FilterPill
+                            label="Category"
+                            value={filters.category}
+                            onChange={setFilter('category')}
+                            options={categoriesInUse.map((t) => ({
+                                value: t,
+                                label: unitMeta(t).label,
+                            }))}
+                        />
+                        <FilterPill
+                            label="Group"
+                            value={filters.group}
+                            onChange={setFilter('group')}
+                            options={[
+                                ...groups.map((g) => ({
+                                    value: String(g.id),
+                                    label: g.name,
+                                })),
+                                { value: NO_GROUP, label: 'No group' },
+                            ]}
+                        />
+                        <FilterPill
+                            label="Condition"
+                            value={filters.condition}
+                            onChange={setFilter('condition')}
+                            options={CONDITIONS}
+                        />
+                        <FilterPill
+                            label="GPS"
+                            value={filters.gps}
+                            onChange={setFilter('gps')}
+                            options={[
+                                { value: 'online', label: 'Online' },
+                                { value: 'offline', label: 'Offline' },
+                            ]}
+                        />
+                    </div>
+                </div>
 
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                {table.getHeaderGroups().map((hg) => (
-                                    <TableRow key={hg.id}>
-                                        {hg.headers.map((header) => (
-                                            <TableHead key={header.id}>
-                                                {header.isPlaceholder
-                                                    ? null
-                                                    : flexRender(
-                                                          header.column
-                                                              .columnDef.header,
-                                                          header.getContext(),
-                                                      )}
-                                            </TableHead>
-                                        ))}
-                                    </TableRow>
-                                ))}
-                            </TableHeader>
-                            <TableBody>
-                                {table.getRowModel().rows.length ? (
-                                    table.getRowModel().rows.map((row) => (
-                                        <TableRow key={row.id}>
+                {/* Desktop table */}
+                <div className="hidden overflow-hidden rounded-xl border bg-card md:block">
+                    {filtered.length === 0 ? (
+                        noResults
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-sidebar text-left text-muted-foreground">
+                                    {table.getHeaderGroups().map((hg) => (
+                                        <tr key={hg.id} className="h-[38px]">
+                                            {hg.headers.map((header) => {
+                                                const sorted =
+                                                    header.column.getIsSorted();
+                                                const right =
+                                                    header.column.id ===
+                                                    'last_seen';
+                                                const content = flexRender(
+                                                    header.column.columnDef
+                                                        .header,
+                                                    header.getContext(),
+                                                );
+
+                                                return (
+                                                    <th
+                                                        key={header.id}
+                                                        aria-sort={
+                                                            sorted === 'asc'
+                                                                ? 'ascending'
+                                                                : sorted ===
+                                                                    'desc'
+                                                                  ? 'descending'
+                                                                  : undefined
+                                                        }
+                                                        className={cn(
+                                                            'px-3 font-medium whitespace-nowrap first:w-10 first:pl-4',
+                                                            right &&
+                                                                'text-right',
+                                                        )}
+                                                    >
+                                                        {header.column.getCanSort() ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={header.column.getToggleSortingHandler()}
+                                                                className="inline-flex items-center gap-1 hover:text-foreground"
+                                                            >
+                                                                {content}
+                                                                {sorted ===
+                                                                    'asc' && (
+                                                                    <ArrowDown className="size-3.5" />
+                                                                )}
+                                                                {sorted ===
+                                                                    'desc' && (
+                                                                    <ArrowUp className="size-3.5" />
+                                                                )}
+                                                            </button>
+                                                        ) : (
+                                                            content
+                                                        )}
+                                                    </th>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </thead>
+                                <tbody>
+                                    {table.getRowModel().rows.map((row) => (
+                                        <tr
+                                            key={row.id}
+                                            className={cn(
+                                                'h-11 border-t transition-colors hover:bg-muted/40',
+                                                row.getIsSelected() &&
+                                                    'bg-accent/50',
+                                            )}
+                                        >
                                             {row
                                                 .getVisibleCells()
                                                 .map((cell) => (
-                                                    <TableCell key={cell.id}>
+                                                    <td
+                                                        key={cell.id}
+                                                        className={cn(
+                                                            'px-3 py-1.5 whitespace-nowrap first:pl-4',
+                                                            cell.column.id ===
+                                                                'last_seen' &&
+                                                                'text-right',
+                                                        )}
+                                                    >
                                                         {flexRender(
                                                             cell.column
                                                                 .columnDef.cell,
                                                             cell.getContext(),
                                                         )}
-                                                    </TableCell>
+                                                    </td>
                                                 ))}
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={columns.length}
-                                            className="h-24 text-center text-muted-foreground"
-                                        >
-                                            No devices found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>
-                            {table.getFilteredRowModel().rows.length} device(s)
-                            total
+                    <div className="flex items-center justify-between gap-4 border-t px-4 py-3 text-sm text-muted-foreground">
+                        <span className="tabular-nums">
+                            Showing {firstRow}–{lastRow} of {filtered.length}
+                            {selectedCount > 0 &&
+                                ` · ${selectedCount} selected`}
                         </span>
                         <div className="flex items-center gap-2">
+                            <span>Rows</span>
+                            <Select
+                                value={String(pageSize)}
+                                onValueChange={(v) =>
+                                    setPagination({
+                                        pageIndex: 0,
+                                        pageSize: Number(v),
+                                    })
+                                }
+                            >
+                                <SelectTrigger
+                                    aria-label="Rows per page"
+                                    className="h-9 w-[72px]"
+                                >
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {[12, 25, 50, 100].map((n) => (
+                                        <SelectItem key={n} value={String(n)}>
+                                            {n}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -829,10 +748,6 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                             >
                                 Previous
                             </Button>
-                            <span>
-                                Page {table.getState().pagination.pageIndex + 1}{' '}
-                                of {table.getPageCount()}
-                            </span>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -844,7 +759,28 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                         </div>
                     </div>
                 </div>
+
+                {/* Mobile cards */}
+                <div className="-mx-4 flex flex-col gap-3 border-t bg-muted/40 px-4 pt-4 md:hidden">
+                    {filtered.length === 0
+                        ? noResults
+                        : filtered.map((device) => (
+                              <DeviceCard key={device.id} device={device} />
+                          ))}
+                </div>
             </div>
+
+            <DeviceDialog
+                key={dialogDevice?.id ?? 'new'}
+                device={dialogDevice}
+                groups={groups}
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+            />
+            <DeleteDeviceDialog
+                device={deleting}
+                onClose={() => setDeleting(null)}
+            />
         </>
     );
 }
