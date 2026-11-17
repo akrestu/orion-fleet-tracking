@@ -75,8 +75,8 @@ const ALERT_META: Record<
     overspeed: {
         label: 'Overspeed',
         icon: Gauge,
-        color: 'var(--color-status-danger)',
-        cls: 'bg-status-danger/10 text-status-danger border-status-danger/30',
+        color: 'var(--color-danger)',
+        cls: 'bg-danger/10 text-danger border-danger/30',
     },
     geofence: {
         label: 'Geofence',
@@ -87,14 +87,14 @@ const ALERT_META: Record<
     offline: {
         label: 'Offline',
         icon: WifiOff,
-        color: 'var(--color-status-offline)',
-        cls: 'bg-status-offline/10 text-status-offline border-status-offline/30',
+        color: 'var(--color-offline)',
+        cls: 'bg-offline/10 text-offline border-offline/30',
     },
     low_signal: {
         label: 'Low Signal',
         icon: Radio,
-        color: 'var(--color-status-warning)',
-        cls: 'bg-status-warning/10 text-status-warning border-status-warning/30',
+        color: 'var(--color-warning)',
+        cls: 'bg-warning/10 text-warning border-warning/30',
     },
 };
 
@@ -120,8 +120,8 @@ const safetyConfig = {
 } satisfies ChartConfig;
 
 const maintenanceConfig = {
-    running: { label: 'Running', color: 'var(--color-status-online)' },
-    idle: { label: 'Idle', color: 'var(--color-status-warning)' },
+    running: { label: 'Running', color: 'var(--color-online)' },
+    idle: { label: 'Idle', color: 'var(--color-warning)' },
 } satisfies ChartConfig;
 
 const speedByDeviceConfig = {
@@ -353,8 +353,8 @@ export default function Dashboard({
                         label="Online"
                         value={stats.onlineDevices}
                         icon={Wifi}
-                        iconClass="bg-status-online/10 text-status-online"
-                        valueClass="text-status-online"
+                        iconClass="bg-online/10 text-online"
+                        valueClass="text-online"
                         sub={`${onlinePct}% availability`}
                     />
                     <StatCard
@@ -620,7 +620,7 @@ export default function Dashboard({
                                     </div>
                                     <div className="mt-4 grid grid-cols-2 gap-2 text-center text-xs">
                                         <div>
-                                            <p className="font-semibold text-status-online">
+                                            <p className="font-semibold text-online">
                                                 {maintenance.running_hours} h
                                             </p>
                                             <p className="text-muted-foreground">
@@ -628,7 +628,7 @@ export default function Dashboard({
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-status-warning">
+                                            <p className="font-semibold text-warning">
                                                 {maintenance.idle_hours} h
                                             </p>
                                             <p className="text-muted-foreground">
@@ -666,11 +666,11 @@ export default function Dashboard({
                                         kilometers
                                     </p>
                                 </div>
-                                <div className="space-y-1 rounded-lg bg-status-online/5 p-4">
+                                <div className="space-y-1 rounded-lg bg-online/5 p-4">
                                     <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                         Op. Hours
                                     </p>
-                                    <p className="text-3xl font-bold text-status-online">
+                                    <p className="text-3xl font-bold text-online">
                                         {productivity.total_op_hours}
                                     </p>
                                     <p className="text-xs text-muted-foreground">

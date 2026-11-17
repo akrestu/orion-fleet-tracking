@@ -70,7 +70,7 @@ export function DeviceSidebarItem({
                 {lastUpdate && (
                     <div className="mt-1 flex items-center gap-1">
                         <span
-                            className={`text-xs ${stale ? 'font-medium text-status-warning' : 'text-muted-foreground'}`}
+                            className={`text-xs ${stale ? 'font-medium text-warning' : 'text-muted-foreground'}`}
                         >
                             {stale && '⚠ '}
                             Update terakhir: {lastUpdate}

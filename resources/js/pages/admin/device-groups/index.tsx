@@ -579,15 +579,15 @@ export default function DeviceGroupsIndex({
                                     <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                         Grouped Devices
                                     </p>
-                                    <p className="mt-1 text-3xl font-bold text-status-online">
+                                    <p className="mt-1 text-3xl font-bold text-online">
                                         {groups.reduce(
                                             (sum, g) => sum + g.devices_count,
                                             0,
                                         )}
                                     </p>
                                 </div>
-                                <div className="rounded-lg bg-status-online-bg p-2">
-                                    <FolderOpen className="h-5 w-5 text-status-online" />
+                                <div className="rounded-lg bg-online-bg p-2">
+                                    <FolderOpen className="h-5 w-5 text-online" />
                                 </div>
                             </div>
                         </CardContent>
@@ -599,12 +599,12 @@ export default function DeviceGroupsIndex({
                                     <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                         Ungrouped Devices
                                     </p>
-                                    <p className="mt-1 text-3xl font-bold text-status-warning">
+                                    <p className="mt-1 text-3xl font-bold text-warning">
                                         {ungroupedCount}
                                     </p>
                                 </div>
-                                <div className="rounded-lg bg-status-warning-bg p-2">
-                                    <FolderOpen className="h-5 w-5 text-status-warning" />
+                                <div className="rounded-lg bg-warning-bg p-2">
+                                    <FolderOpen className="h-5 w-5 text-warning" />
                                 </div>
                             </div>
                         </CardContent>

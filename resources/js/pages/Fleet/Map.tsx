@@ -207,26 +207,26 @@ export default function FleetMap({
                 <ToggleGroupItem
                     value="online"
                     aria-label="Tampilkan unit online"
-                    className="h-auto flex-col items-start gap-0 rounded-md! bg-status-online/5 px-2 py-2 text-left hover:bg-status-online/10 data-[state=on]:bg-status-online/15 data-[state=on]:text-status-online data-[state=on]:ring-1 data-[state=on]:ring-status-online/40"
+                    className="h-auto flex-col items-start gap-0 rounded-md! bg-online/5 px-2 py-2 text-left hover:bg-online/10 data-[state=on]:bg-online/15 data-[state=on]:text-online data-[state=on]:ring-1 data-[state=on]:ring-online/40"
                 >
-                    <p className="flex items-center gap-1 text-xs text-status-online">
-                        <span className="h-1.5 w-1.5 rounded-full bg-status-online" />
+                    <p className="flex items-center gap-1 text-xs text-online">
+                        <span className="h-1.5 w-1.5 rounded-full bg-online" />
                         Online
                     </p>
-                    <p className="text-lg font-bold text-status-online">
+                    <p className="text-lg font-bold text-online">
                         {onlineCount}
                     </p>
                 </ToggleGroupItem>
                 <ToggleGroupItem
                     value="offline"
                     aria-label="Tampilkan unit offline"
-                    className="h-auto flex-col items-start gap-0 rounded-md! bg-status-offline/5 px-2 py-2 text-left hover:bg-status-offline/10 data-[state=on]:bg-status-offline/15 data-[state=on]:text-status-offline data-[state=on]:ring-1 data-[state=on]:ring-status-offline/40"
+                    className="h-auto flex-col items-start gap-0 rounded-md! bg-offline/5 px-2 py-2 text-left hover:bg-offline/10 data-[state=on]:bg-offline/15 data-[state=on]:text-offline data-[state=on]:ring-1 data-[state=on]:ring-offline/40"
                 >
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span className="h-1.5 w-1.5 rounded-full bg-status-offline" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-offline" />
                         Offline
                     </p>
-                    <p className="text-lg font-bold text-status-offline">
+                    <p className="text-lg font-bold text-offline">
                         {offlineCount}
                     </p>
                 </ToggleGroupItem>

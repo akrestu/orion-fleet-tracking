@@ -19,12 +19,12 @@ const badgeVariants = cva(
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         // Orion — device-state variants (tinted bg + status foreground)
-        online: "border-transparent bg-status-online-bg text-status-online",
+        online: "border-transparent bg-online-bg text-online",
         offline:
-          "border-transparent bg-status-offline-bg text-status-offline",
+          "border-transparent bg-offline-bg text-offline",
         warning:
-          "border-transparent bg-status-warning-bg text-status-warning",
-        danger: "border-transparent bg-status-danger-bg text-status-danger",
+          "border-transparent bg-warning-bg text-warning",
+        danger: "border-transparent bg-danger-bg text-danger",
       },
     },
     defaultVariants: {

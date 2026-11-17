@@ -1,0 +1,228 @@
+/*
+ * ORION Fleet Intelligence — design tokens (Tailwind CSS v4 + shadcn/ui)
+ *
+ * Usage: in resources/css/app.css
+ *   @import 'tailwindcss';
+ *   @import './orion-tokens.css';   (Geist fonts are loaded by the Vite bunny() plugin)
+ * and REMOVE the starter kit's existing :root / .dark / @theme inline colour blocks
+ * (this file replaces them 1:1 and adds ORION-specific tokens).
+ *
+ * Three colour channels that must never collide:
+ *   1. status   — online / offline / warning / danger (only place green/amber/red appear)
+ *   2. speed    — slow / mod / fast, single-hue cerulean ramp (fast ≠ fault)
+ *   3. unit     — 8 category hues (195–340), always paired with a silhouette icon
+ */
+
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+
+  /* shadcn semantic */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ORION — status channel  (bg-online-bg text-online …) */
+  --color-online: var(--online);
+  --color-online-bg: var(--online-bg);
+  --color-offline: var(--offline);
+  --color-offline-bg: var(--offline-bg);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+
+  /* ORION — speed channel */
+  --color-speed-slow: var(--speed-slow);
+  --color-speed-mod: var(--speed-mod);
+  --color-speed-fast: var(--speed-fast);
+
+  /* ORION — unit-type channel (identical in both themes) */
+  --color-unit-oht: var(--unit-oht);
+  --color-unit-dump-truck: var(--unit-dump-truck);
+  --color-unit-dozer: var(--unit-dozer);
+  --color-unit-excavator: var(--unit-excavator);
+  --color-unit-grader: var(--unit-grader);
+  --color-unit-compactor: var(--unit-compactor);
+  --color-unit-driller: var(--unit-driller);
+  --color-unit-other: var(--unit-other);
+
+  /* ORION — map surface */
+  --color-map: var(--map);
+  --color-map-contour: var(--map-contour);
+  --color-map-road: var(--map-road);
+
+  --animate-live-pulse: live-pulse 1.6s ease-out infinite;
+}
+
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--online) 55%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-live-pulse { animation: none; }
+}
+
+:root {
+  --radius: 8px;
+
+  --background: oklch(0.985 0.002 250);
+  --foreground: oklch(0.2 0.012 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.012 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.012 250);
+  --primary: oklch(0.52 0.15 232);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.965 0.003 250);
+  --secondary-foreground: oklch(0.2 0.012 250);
+  --muted: oklch(0.95 0.004 250);
+  --muted-foreground: oklch(0.47 0.012 250);
+  --accent: oklch(0.95 0.03 232);
+  --accent-foreground: oklch(0.42 0.13 240);
+  --destructive: oklch(0.54 0.2 27);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.915 0.004 250);
+  --input: oklch(0.89 0.005 250);
+  --ring: oklch(0.52 0.15 232);
+
+  --chart-1: oklch(0.52 0.15 232);
+  --chart-2: oklch(0.64 0.14 222);
+  --chart-3: oklch(0.52 0.22 295);
+  --chart-4: oklch(0.58 0.13 205);
+  --chart-5: oklch(0.6 0.01 250);
+
+  --sidebar: oklch(0.975 0.003 250);
+  --sidebar-foreground: oklch(0.2 0.012 250);
+  --sidebar-primary: oklch(0.52 0.15 232);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.94 0.005 250);
+  --sidebar-accent-foreground: oklch(0.2 0.012 250);
+  --sidebar-border: oklch(0.915 0.004 250);
+  --sidebar-ring: oklch(0.52 0.15 232);
+
+  --online: oklch(0.45 0.13 150);
+  --online-bg: oklch(0.95 0.045 150);
+  --offline: oklch(0.42 0.01 250);
+  --offline-bg: oklch(0.94 0.004 250);
+  --warning: oklch(0.46 0.1 62);
+  --warning-bg: oklch(0.96 0.06 88);
+  --danger: oklch(0.5 0.2 27);
+  --danger-bg: oklch(0.95 0.03 25);
+
+  --speed-slow: oklch(0.78 0.09 232);
+  --speed-mod: oklch(0.58 0.14 232);
+  --speed-fast: oklch(0.38 0.12 242);
+
+  --unit-oht: oklch(0.5 0.21 265);
+  --unit-dump-truck: oklch(0.52 0.22 295);
+  --unit-dozer: oklch(0.58 0.22 340);
+  --unit-excavator: oklch(0.58 0.13 205);
+  --unit-grader: oklch(0.64 0.14 222);
+  --unit-compactor: oklch(0.6 0.2 320);
+  --unit-driller: oklch(0.42 0.12 250);
+  --unit-other: oklch(0.5 0.02 250);
+
+  --map: oklch(0.94 0.012 100);
+  --map-contour: oklch(0.86 0.02 90);
+  --map-road: oklch(0.99 0.004 90);
+}
+
+.dark {
+  --background: oklch(0.14 0.004 250);
+  --foreground: oklch(0.96 0.003 250);
+  --card: oklch(0.18 0.005 250);
+  --card-foreground: oklch(0.96 0.003 250);
+  --popover: oklch(0.2 0.005 250);
+  --popover-foreground: oklch(0.96 0.003 250);
+  --primary: oklch(0.72 0.13 230);
+  --primary-foreground: oklch(0.15 0.02 240);
+  --secondary: oklch(0.23 0.005 250);
+  --secondary-foreground: oklch(0.96 0.003 250);
+  --muted: oklch(0.24 0.005 250);
+  --muted-foreground: oklch(0.72 0.01 250);
+  --accent: oklch(0.3 0.06 232);
+  --accent-foreground: oklch(0.82 0.1 230);
+  --destructive: oklch(0.7 0.17 25);
+  --destructive-foreground: oklch(0.15 0.02 25);
+  --border: oklch(0.28 0.006 250);
+  --input: oklch(0.33 0.006 250);
+  --ring: oklch(0.72 0.13 230);
+
+  --chart-1: oklch(0.72 0.13 230);
+  --chart-2: oklch(0.82 0.08 225);
+  --chart-3: oklch(0.7 0.14 295);
+  --chart-4: oklch(0.75 0.1 200);
+  --chart-5: oklch(0.6 0.01 250);
+
+  --sidebar: oklch(0.16 0.004 250);
+  --sidebar-foreground: oklch(0.96 0.003 250);
+  --sidebar-primary: oklch(0.72 0.13 230);
+  --sidebar-primary-foreground: oklch(0.15 0.02 240);
+  --sidebar-accent: oklch(0.24 0.005 250);
+  --sidebar-accent-foreground: oklch(0.96 0.003 250);
+  --sidebar-border: oklch(0.28 0.006 250);
+  --sidebar-ring: oklch(0.72 0.13 230);
+
+  --online: oklch(0.82 0.13 150);
+  --online-bg: oklch(0.3 0.06 150);
+  --offline: oklch(0.8 0.01 250);
+  --offline-bg: oklch(0.26 0.005 250);
+  --warning: oklch(0.86 0.12 82);
+  --warning-bg: oklch(0.32 0.06 80);
+  --danger: oklch(0.78 0.14 25);
+  --danger-bg: oklch(0.3 0.08 25);
+
+  --speed-slow: oklch(0.5 0.08 232);
+  --speed-mod: oklch(0.72 0.12 230);
+  --speed-fast: oklch(0.88 0.08 225);
+
+  --map: oklch(0.2 0.012 120);
+  --map-contour: oklch(0.3 0.015 110);
+  --map-road: oklch(0.34 0.012 80);
+}
+
+@layer base {
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans antialiased; }
+  /* Tabular numerals everywhere data is shown */
+  table, [data-numeric], .tabular { font-variant-numeric: tabular-nums; }
+}

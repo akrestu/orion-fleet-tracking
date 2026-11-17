@@ -26,10 +26,10 @@ export const STATUS_LABEL: Record<DeviceStatus, string> = {
     danger: 'Danger',
 };
 
-export const STATUS_ONLINE = 'var(--color-status-online)';
-export const STATUS_OFFLINE = 'var(--color-status-offline)';
-export const STATUS_WARNING = 'var(--color-status-warning)';
-export const STATUS_DANGER = 'var(--color-status-danger)';
+export const STATUS_ONLINE = 'var(--color-online)';
+export const STATUS_OFFLINE = 'var(--color-offline)';
+export const STATUS_WARNING = 'var(--color-warning)';
+export const STATUS_DANGER = 'var(--color-danger)';
 
 /** Per-status foreground color var, for inline styles where a Tailwind
  *  utility class can't be statically named (e.g. a marker colored per
@@ -43,7 +43,7 @@ export const STATUS_COLOR_VAR: Record<DeviceStatus, string> = {
 
 const SPEED_COLORS: Record<SpeedBand, string> = {
     slow: 'var(--color-speed-slow)',
-    moderate: 'var(--color-speed-moderate)',
+    moderate: 'var(--color-speed-mod)',
     fast: 'var(--color-speed-fast)',
 };
 

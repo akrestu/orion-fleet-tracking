@@ -105,7 +105,7 @@ export function DeviceMarker({ device, isSelected }: DeviceMarkerProps) {
                             className="mt-1 text-xs"
                             style={{
                                 color: stale
-                                    ? 'var(--color-status-warning)'
+                                    ? 'var(--color-warning)'
                                     : 'var(--color-muted-foreground)',
                                 fontWeight: stale ? 500 : undefined,
                             }}

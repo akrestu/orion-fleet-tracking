@@ -94,7 +94,7 @@ function ResolveAlertButton({ alert }: { alert: AdminAlert }) {
         <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-status-online hover:text-status-online"
+            className="h-8 w-8 text-online hover:text-online"
             onClick={() =>
                 patch(AlertController.resolve.url(alert.id), {
                     preserveScroll: true,
@@ -333,7 +333,7 @@ export default function AlertsIndex({ alerts, devices }: PageProps) {
                         <p className="text-sm text-muted-foreground">
                             {activeCount > 0 ? (
                                 <>
-                                    <span className="font-medium text-status-danger">
+                                    <span className="font-medium text-danger">
                                         {activeCount} active
                                     </span>{' '}
                                     alert

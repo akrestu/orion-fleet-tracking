@@ -1147,7 +1147,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                 </Button>
             ),
             cell: ({ row }) => (
-                <span className="text-status-online tabular-nums">
+                <span className="text-online tabular-nums">
                     {row.original.running_hours} h
                 </span>
             ),
@@ -1176,7 +1176,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                         : 0;
 
                 return (
-                    <span className="text-status-warning tabular-nums">
+                    <span className="text-warning tabular-nums">
                         {row.original.idle_hours} h
                         {pct > 0 && (
                             <span className="ml-1 text-xs opacity-70">
@@ -1297,7 +1297,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription>Running Hours</CardDescription>
-                            <CardTitle className="text-2xl text-status-online tabular-nums">
+                            <CardTitle className="text-2xl text-online tabular-nums">
                                 {totalRunning.toFixed(1)} h
                             </CardTitle>
                         </CardHeader>
@@ -1305,7 +1305,7 @@ function FleetUtilizationTab({ devices }: { devices: DeviceOption[] }) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription>Idle Hours</CardDescription>
-                            <CardTitle className="text-2xl text-status-warning tabular-nums">
+                            <CardTitle className="text-2xl text-warning tabular-nums">
                                 {totalIdle.toFixed(1)} h
                                 {totalHours > 0 && (
                                     <span className="ml-1 text-sm font-normal opacity-70">
@@ -1554,7 +1554,7 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
             ),
             cell: ({ row }) =>
                 row.original.speed_kmh !== null ? (
-                    <span className="font-medium text-status-danger tabular-nums">
+                    <span className="font-medium text-danger tabular-nums">
                         {row.original.speed_kmh} km/h
                     </span>
                 ) : (
@@ -1670,7 +1670,7 @@ function SpeedViolationsTab({ devices }: { devices: DeviceOption[] }) {
                                                 {s.violation_count}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-status-danger tabular-nums">
+                                        <TableCell className="text-danger tabular-nums">
                                             {s.max_speed_kmh !== null
                                                 ? `${s.max_speed_kmh} km/h`
                                                 : '—'}
@@ -2255,7 +2255,7 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
             />
 
             {warning && (
-                <div className="rounded-md border border-status-warning/30 bg-status-warning-bg px-4 py-3 text-sm text-status-warning">
+                <div className="rounded-md border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-warning">
                     {warning}
                 </div>
             )}
@@ -2622,13 +2622,13 @@ function DelayWaitingTab({ devices }: { devices: DeviceOption[] }) {
                                         <TableCell className="tabular-nums">
                                             {s.waiting_count}
                                         </TableCell>
-                                        <TableCell className="text-status-warning tabular-nums">
+                                        <TableCell className="text-warning tabular-nums">
                                             {formatMin(s.waiting_min)}
                                         </TableCell>
                                         <TableCell className="tabular-nums">
                                             {s.delay_count}
                                         </TableCell>
-                                        <TableCell className="text-status-danger tabular-nums">
+                                        <TableCell className="text-danger tabular-nums">
                                             {formatMin(s.delay_min)}
                                         </TableCell>
                                     </TableRow>

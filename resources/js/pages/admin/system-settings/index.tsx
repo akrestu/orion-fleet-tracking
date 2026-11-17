@@ -255,8 +255,8 @@ function NewTokenBanner({
     };
 
     return (
-        <div className="space-y-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4">
-            <p className="text-sm font-medium text-status-warning">
+        <div className="space-y-2 rounded-lg border border-warning/30 bg-warning-bg p-4">
+            <p className="text-sm font-medium text-warning">
                 Copy your new API token now — it won't be shown again.
             </p>
             <div className="flex items-center gap-2">

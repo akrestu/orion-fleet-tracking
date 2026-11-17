@@ -17,8 +17,8 @@ export const UNIT_CATEGORIES = {
     dt: {
         label: 'DT – Dump Truck',
         abbr: 'DT',
-        color: 'var(--color-unit-dt)',
-        dark: 'var(--color-unit-dt)',
+        color: 'var(--color-unit-dump-truck)',
+        dark: 'var(--color-unit-dump-truck)',
         models: [
             'Hino 500 FM260TI',
             'Hino 500 FM320TI',

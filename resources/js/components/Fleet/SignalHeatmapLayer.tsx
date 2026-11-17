@@ -66,9 +66,9 @@ function HeatmapRenderer({ timeRange }: Props) {
                     maxZoom: 18,
                     max: 1.0,
                     gradient: {
-                        0.0: resolveToken('var(--color-status-danger)'), // poor signal
-                        0.4: resolveToken('var(--color-status-warning)'), // moderate
-                        0.7: resolveToken('var(--color-status-online)'), // good signal
+                        0.0: resolveToken('var(--color-danger)'), // poor signal
+                        0.4: resolveToken('var(--color-warning)'), // moderate
+                        0.7: resolveToken('var(--color-online)'), // good signal
                         1.0: resolveToken('var(--color-primary)'), // excellent
                     },
                 }).addTo(map);
@@ -99,11 +99,11 @@ function HeatmapRenderer({ timeRange }: Props) {
                 {pointCount.toLocaleString()} titik RSSI
             </p>
             <div className="mt-1.5 flex items-center gap-1 text-xs">
-                <span className="inline-block h-2 w-4 rounded-sm bg-status-danger" />{' '}
+                <span className="inline-block h-2 w-4 rounded-sm bg-danger" />{' '}
                 Lemah
-                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-status-warning" />{' '}
+                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-warning" />{' '}
                 Sedang
-                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-status-online" />{' '}
+                <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-online" />{' '}
                 Baik
                 <span className="ml-1 inline-block h-2 w-4 rounded-sm bg-primary" />{' '}
                 Sangat Baik
