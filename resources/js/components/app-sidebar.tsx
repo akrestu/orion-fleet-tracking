@@ -96,7 +96,7 @@ export function AppSidebar() {
     const isAdmin = auth.user.role === 'admin';
 
     return (
-        <Sidebar collapsible="icon" variant="inset">
+        <Sidebar collapsible="icon" variant="sidebar">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
@@ -114,7 +114,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={mainNavItems} label="Main" />
                 {isAdmin && <NavMain items={adminNavItems} label="Admin" />}
             </SidebarContent>
 
