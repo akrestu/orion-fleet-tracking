@@ -116,3 +116,24 @@ export const ZONE_COLORS = {
     parking: 'oklch(0.6 0.01 250)',
     general: 'oklch(0.58 0.22 340)',
 } as const;
+
+/**
+ * Geofence colour swatches as hex — the backend stores a zone's colour as `#rrggbb`.
+ * First four match ZONE_COLORS (loading, dumping, waiting, general), then unit blue and neutral.
+ */
+export const GEOFENCE_SWATCHES = [
+    '#0f8a96',
+    '#7a3fe0',
+    '#119ccb',
+    '#cc2f9c',
+    '#2d50d8',
+    '#7d8187',
+] as const;
+
+/** Default swatch per backend zone type (`none` = general). */
+export const ZONE_TYPE_SWATCH = {
+    loading: '#0f8a96',
+    dumping: '#7a3fe0',
+    parking: '#7d8187',
+    none: '#cc2f9c',
+} as const;

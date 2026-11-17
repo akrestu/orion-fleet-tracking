@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreGeofenceRequest;
 use App\Http\Requests\Admin\UpdateGeofenceRequest;
 use App\Models\Geofence;
+use App\Models\GeofenceDeviceState;
 use App\Models\MapTileset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Cache;
@@ -20,6 +21,16 @@ class GeofenceController extends Controller
             ->orderBy('name')
             ->get();
 
+        /** @var array<int, int> $unitsInside */
+        $unitsInside = GeofenceDeviceState::query()
+            ->where('is_inside', true)
+            ->selectRaw('geofence_id, COUNT(*) as aggregate')
+            ->groupBy('geofence_id')
+            ->toBase()
+            ->pluck('aggregate', 'geofence_id')
+            ->map(fn ($count) => (int) $count)
+            ->all();
+
         return Inertia::render('admin/geofences/index', [
             'geofences' => $geofences->map(fn (Geofence $g) => [
                 'id' => $g->id,
@@ -30,6 +41,7 @@ class GeofenceController extends Controller
                 'is_active' => $g->is_active,
                 'zone_type' => $g->zone_type,
                 'vertex_count' => count($g->polygon),
+                'units_inside' => $unitsInside[$g->id] ?? 0,
             ]),
             'tilesets' => MapTileset::orderBy('name')->get()->map(fn (MapTileset $t) => [
                 'id' => $t->id,

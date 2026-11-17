@@ -1,52 +1,37 @@
 import 'leaflet/dist/leaflet.css';
 
-import { Head, useForm } from '@inertiajs/react';
-import { MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
+import L from 'leaflet';
+import { Hexagon, Pencil, Plus, Search, Trash2, Undo2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    LayersControl,
+    CircleMarker,
     MapContainer,
+    Marker,
     Polygon,
+    Polyline,
     TileLayer,
+    Tooltip,
     useMap,
     useMapEvents,
 } from 'react-leaflet';
 import GeofenceController from '@/actions/App/Http/Controllers/Admin/GeofenceController';
+import { MAP_CARD } from '@/components/Fleet/map-overlays';
 import type { Tileset } from '@/components/Fleet/MapTileUpload';
 import InputError from '@/components/input-error';
-import { Badge } from '@/components/ui/badge';
-import type { BadgeVariant } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+    GEOFENCE_SWATCHES,
+    ZONE_TYPE_SWATCH,
+} from '@/components/orion/map-marker';
+import { EmptyState } from '@/components/orion/misc';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 import { index as adminGeofencesIndex } from '@/routes/admin/geofences';
 
 type LatLng = { lat: number; lng: number };
-
 type ZoneType = 'none' | 'loading' | 'dumping' | 'parking';
 
 type GeofenceRow = {
@@ -58,6 +43,7 @@ type GeofenceRow = {
     is_active: boolean;
     zone_type: ZoneType;
     vertex_count: number;
+    units_inside: number;
 };
 
 type PageProps = {
@@ -65,217 +51,7 @@ type PageProps = {
     tilesets: Tileset[];
 };
 
-const BASE_LAYER_STORAGE_KEY = 'orion-map-base-layer';
-const DEFAULT_BASE_LAYER = 'Satelit (Esri)';
-
-const ZONE_TYPE_LABELS: Record<ZoneType, string> = {
-    none: 'General',
-    loading: 'Loading Zone',
-    dumping: 'Dumping Zone',
-    parking: 'Parking Zone',
-};
-
-// Loading/dumping zones carry real operational risk (equipment converging,
-// tipping hazards), so they borrow the same warning/danger tokens used for
-// device status elsewhere — same colors, same meaning, everywhere in Orion.
-const ZONE_TYPE_VARIANT: Record<ZoneType, BadgeVariant> = {
-    none: 'secondary',
-    loading: 'warning',
-    dumping: 'danger',
-    parking: 'secondary',
-};
-
-// ---- Calls invalidateSize after map mounts inside a dialog ----
-function MapInvalidator() {
-    const map = useMap();
-    useEffect(() => {
-        const id = setTimeout(() => map.invalidateSize(), 100);
-
-        return () => clearTimeout(id);
-    }, [map]);
-
-    return null;
-}
-
-// ---- Map click handler for polygon drawing ----
-function PolygonDrawer({
-    points,
-    onPointAdded,
-}: {
-    points: LatLng[];
-    onPointAdded: (p: LatLng) => void;
-}) {
-    useMapEvents({
-        click(e) {
-            onPointAdded({ lat: e.latlng.lat, lng: e.latlng.lng });
-        },
-    });
-
-    if (points.length === 0) {
-        return null;
-    }
-
-    return (
-        <Polygon
-            positions={points.map((p) => [p.lat, p.lng])}
-            pathOptions={{ color: '#f59e0b', fillOpacity: 0.2 }}
-        />
-    );
-}
-
-// ---- Polygon map dialog ----
-const DEFAULT_CENTER: [number, number] = [-3.779223, 103.67939];
-
-function PolygonMapDialog({
-    open,
-    initialPoints,
-    tilesets,
-    onClose,
-    onConfirm,
-}: {
-    open: boolean;
-    initialPoints: LatLng[];
-    color: string;
-    tilesets: Tileset[];
-    onClose: () => void;
-    onConfirm: (points: LatLng[]) => void;
-}) {
-    const [points, setPoints] = useState<LatLng[]>(initialPoints);
-    const [wasOpen, setWasOpen] = useState(open);
-
-    // Reset the drawn polygon each time the dialog opens (adjust-state-during-render pattern).
-    if (open !== wasOpen) {
-        setWasOpen(open);
-
-        if (open) {
-            setPoints(initialPoints);
-        }
-    }
-
-    const activeBaseLayer = (() => {
-        const saved =
-            localStorage.getItem(BASE_LAYER_STORAGE_KEY) ?? DEFAULT_BASE_LAYER;
-        const available = [
-            'Satelit (Esri)',
-            'OpenStreetMap',
-            ...tilesets.map((t) => t.name),
-        ];
-
-        return available.includes(saved) ? saved : DEFAULT_BASE_LAYER;
-    })();
-
-    const handleConfirm = () => {
-        if (points.length < 3) {
-            return;
-        }
-
-        onConfirm(points);
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-            <DialogContent className="max-w-3xl gap-0 overflow-hidden p-0">
-                <DialogHeader className="px-6 pt-6 pb-4">
-                    <DialogTitle>Draw Geofence Zone</DialogTitle>
-                    <DialogDescription>
-                        Click on the map to add polygon vertices. Minimum 3
-                        points required.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="relative" style={{ height: 420 }}>
-                    <MapContainer
-                        center={DEFAULT_CENTER}
-                        zoom={14}
-                        style={{ height: '100%', width: '100%' }}
-                        zoomControl
-                    >
-                        <LayersControl position="topright">
-                            <LayersControl.BaseLayer
-                                checked={activeBaseLayer === 'Satelit (Esri)'}
-                                name="Satelit (Esri)"
-                            >
-                                <TileLayer
-                                    url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                    attribution="Tiles &copy; Esri"
-                                    maxZoom={19}
-                                />
-                            </LayersControl.BaseLayer>
-
-                            <LayersControl.BaseLayer
-                                checked={activeBaseLayer === 'OpenStreetMap'}
-                                name="OpenStreetMap"
-                            >
-                                <TileLayer
-                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                />
-                            </LayersControl.BaseLayer>
-
-                            {tilesets.map((tileset) => (
-                                <LayersControl.BaseLayer
-                                    key={tileset.id}
-                                    checked={activeBaseLayer === tileset.name}
-                                    name={tileset.name}
-                                >
-                                    <TileLayer
-                                        url={tileset.tile_url}
-                                        attribution={`Peta kustom: ${tileset.name}`}
-                                        minZoom={tileset.min_zoom}
-                                        maxZoom={tileset.max_zoom}
-                                    />
-                                </LayersControl.BaseLayer>
-                            ))}
-                        </LayersControl>
-                        <MapInvalidator />
-                        <PolygonDrawer
-                            points={points}
-                            onPointAdded={(p) =>
-                                setPoints((prev) => [...prev, p])
-                            }
-                        />
-                    </MapContainer>
-
-                    <div className="absolute bottom-3 left-3 z-[1000] rounded-md bg-black/60 px-2 py-1 text-xs text-white">
-                        {points.length} point{points.length !== 1 ? 's' : ''}
-                        {points.length < 3 && ' (need at least 3)'}
-                    </div>
-
-                    {points.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setPoints((prev) => prev.slice(0, -1))
-                            }
-                            className="absolute top-3 right-3 z-[1000] flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs text-white hover:bg-black/80"
-                        >
-                            <X className="h-3 w-3" />
-                            Undo
-                        </button>
-                    )}
-                </div>
-
-                <DialogFooter className="border-t px-6 py-4">
-                    <Button variant="outline" onClick={() => setPoints([])}>
-                        Clear
-                    </Button>
-                    <Button variant="outline" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleConfirm}
-                        disabled={points.length < 3}
-                    >
-                        Use This Zone ({points.length} pts)
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-// ---- Shared form fields ----
-type GeofenceFormData = {
+type ZoneForm = {
     name: string;
     description: string;
     color: string;
@@ -284,505 +60,716 @@ type GeofenceFormData = {
     zone_type: ZoneType;
 };
 
-function GeofenceFormFields({
-    data,
-    setData,
-    errors,
-    onDrawClick,
+/** Editor session: a zone being drawn/edited. `id` null = new zone. */
+type Draft = { id: number | null } | null;
+type Tool = 'draw' | 'edit' | null;
+
+const ZONE_TYPES: { value: ZoneType; label: string }[] = [
+    { value: 'loading', label: 'Loading' },
+    { value: 'dumping', label: 'Dumping' },
+    { value: 'parking', label: 'Parking' },
+    { value: 'none', label: 'General' },
+];
+const TYPE_LABEL: Record<ZoneType, string> = {
+    loading: 'Loading',
+    dumping: 'Dumping',
+    parking: 'Parking',
+    none: 'General',
+};
+const EMPTY_ZONE: ZoneForm = {
+    name: '',
+    description: '',
+    color: ZONE_TYPE_SWATCH.loading,
+    polygon: [],
+    is_active: true,
+    zone_type: 'loading',
+};
+const DEFAULT_CENTER: [number, number] = [-3.779223, 103.67939];
+const EARTH_RADIUS_M = 6_371_008;
+
+/** Polygon area in hectares (local equirectangular projection — fine at site scale). */
+function areaHa(points: LatLng[]): number {
+    if (points.length < 3) {
+        return 0;
+    }
+
+    const lat0 = (points[0].lat * Math.PI) / 180;
+    const xy = points.map((p) => [
+        ((p.lng * Math.PI) / 180) * EARTH_RADIUS_M * Math.cos(lat0),
+        ((p.lat * Math.PI) / 180) * EARTH_RADIUS_M,
+    ]);
+    let sum = 0;
+
+    for (let i = 0; i < xy.length; i++) {
+        const [x1, y1] = xy[i];
+        const [x2, y2] = xy[(i + 1) % xy.length];
+        sum += x1 * y2 - x2 * y1;
+    }
+
+    return Math.abs(sum) / 2 / 10_000;
+}
+
+function toLatLngs(points: LatLng[]): [number, number][] {
+    return points.map((p) => [p.lat, p.lng]);
+}
+
+/** Draggable vertex handle: white dot with a zone-colour border. */
+function vertexIcon(color: string): L.DivIcon {
+    return L.divIcon({
+        className: 'orion-marker',
+        html: `<span style="display:block;width:16px;height:16px;border-radius:9999px;background:#fff;border:2px solid ${color};box-shadow:0 1px 2px rgb(0 0 0 / .35)"></span>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+    });
+}
+
+/** Frames all zones once on load. */
+function FitZones({ zones }: { zones: GeofenceRow[] }) {
+    const map = useMap();
+    const done = useRef(false);
+
+    useEffect(() => {
+        const points = zones.flatMap((z) => toLatLngs(z.polygon));
+
+        if (done.current || points.length === 0) {
+            return;
+        }
+
+        done.current = true;
+        map.fitBounds(L.latLngBounds(points), {
+            padding: [48, 48],
+            maxZoom: 17,
+        });
+    }, [map, zones]);
+
+    return null;
+}
+
+/** Flies to the selected zone. */
+function FocusZone({ zone }: { zone: GeofenceRow | undefined }) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (zone && zone.polygon.length > 0) {
+            map.flyToBounds(L.latLngBounds(toLatLngs(zone.polygon)), {
+                padding: [80, 80],
+                maxZoom: 18,
+                duration: 0.6,
+            });
+        }
+    }, [map, zone]);
+
+    return null;
+}
+
+/** Click adds a vertex, double-click closes; tracks the cursor for the dashed closing segment. */
+function DrawHandler({
+    active,
+    onAdd,
+    onClose,
+    onCursor,
 }: {
-    data: GeofenceFormData;
-    setData: (key: keyof GeofenceFormData, value: unknown) => void;
-    errors: Partial<Record<string, string>>;
-    onDrawClick: () => void;
+    active: boolean;
+    onAdd: (p: LatLng) => void;
+    onClose: () => void;
+    onCursor: (p: LatLng | null) => void;
 }) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (!active) {
+            return;
+        }
+
+        const container = map.getContainer();
+        map.doubleClickZoom.disable();
+        container.style.cursor = 'crosshair';
+
+        return () => {
+            map.doubleClickZoom.enable();
+            container.style.cursor = '';
+        };
+    }, [map, active]);
+
+    useMapEvents({
+        click(e) {
+            if (active) {
+                onAdd({ lat: e.latlng.lat, lng: e.latlng.lng });
+            }
+        },
+        dblclick() {
+            if (active) {
+                onClose();
+            }
+        },
+        mousemove(e) {
+            if (active) {
+                onCursor({ lat: e.latlng.lat, lng: e.latlng.lng });
+            }
+        },
+        mouseout() {
+            onCursor(null);
+        },
+    });
+
+    return null;
+}
+
+function ZoneEditor({
+    zone,
+    form,
+    tool,
+    onCancel,
+    onSaved,
+}: {
+    zone: GeofenceRow | null;
+    form: ReturnType<typeof useForm<ZoneForm>>;
+    tool: Tool;
+    onCancel: () => void;
+    onSaved: () => void;
+}) {
+    const { data, setData, post, put, processing, errors } = form;
+    const vertices = data.polygon.length;
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const options = { preserveScroll: true, onSuccess: onSaved };
+
+        if (zone) {
+            put(GeofenceController.update.url(zone.id), options);
+        } else {
+            post(GeofenceController.store.url(), options);
+        }
+    };
+
+    const remove = () => {
+        if (zone && window.confirm(`Delete zone “${zone.name}”?`)) {
+            router.delete(GeofenceController.destroy.url(zone.id), {
+                preserveScroll: true,
+                onSuccess: onSaved,
+            });
+        }
+    };
+
+    let help = 'Use the toolbar to draw or edit vertices';
+
+    if (tool === 'draw') {
+        help = 'Click the map to add vertices · double-click to close';
+    } else if (tool === 'edit') {
+        help = 'Drag the white vertices to reshape the zone';
+    }
+
     return (
-        <div className="space-y-4">
-            <div className="grid gap-2">
-                <Label htmlFor="name">Name</Label>
+        <form
+            onSubmit={submit}
+            className={cn(MAP_CARD, 'flex w-[320px] flex-col gap-4 p-5')}
+        >
+            <div>
+                <h2 className="font-semibold">
+                    {zone ? 'Edit zone' : 'New zone'}
+                </h2>
+                <p className="text-xs text-muted-foreground">{help}</p>
+            </div>
+
+            <dl className="grid grid-cols-2 gap-3 rounded-lg bg-muted px-3 py-2 text-sm">
+                <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">Vertices</dt>
+                    <dd className="font-semibold tabular-nums">{vertices}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                    <dt className="text-muted-foreground">Area</dt>
+                    <dd className="font-semibold tabular-nums">
+                        {areaHa(data.polygon).toFixed(1)} ha
+                    </dd>
+                </div>
+            </dl>
+            {errors.polygon && <InputError message={errors.polygon} />}
+
+            <div className="grid gap-1.5">
+                <Label htmlFor="zone-name">Zone name</Label>
                 <Input
-                    id="name"
+                    id="zone-name"
                     value={data.name}
                     onChange={(e) => setData('name', e.target.value)}
-                    placeholder="e.g. Pit Area A"
+                    placeholder="Loading · Pit N2"
                 />
                 <InputError message={errors.name} />
             </div>
 
-            <div className="grid gap-2">
-                <Label htmlFor="description">Description</Label>
-                <Input
-                    id="description"
-                    value={data.description}
-                    onChange={(e) => setData('description', e.target.value)}
-                    placeholder="Optional description"
-                />
-                <InputError message={errors.description} />
-            </div>
+            <fieldset>
+                <legend className="mb-1.5 text-sm font-medium">
+                    Zone type
+                </legend>
+                <div className="flex flex-wrap gap-1.5">
+                    {ZONE_TYPES.map((t) => (
+                        <button
+                            key={t.value}
+                            type="button"
+                            aria-pressed={data.zone_type === t.value}
+                            onClick={() =>
+                                setData((d) => ({
+                                    ...d,
+                                    zone_type: t.value,
+                                    // Follow the type's colour unless one was picked by hand.
+                                    color:
+                                        d.color ===
+                                        ZONE_TYPE_SWATCH[d.zone_type]
+                                            ? ZONE_TYPE_SWATCH[t.value]
+                                            : d.color,
+                                }))
+                            }
+                            className={cn(
+                                'h-9 rounded-full border px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring',
+                                data.zone_type === t.value
+                                    ? 'border-foreground bg-foreground text-background'
+                                    : 'hover:bg-muted',
+                            )}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+                <InputError message={errors.zone_type} />
+            </fieldset>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                    <Label htmlFor="color">Zone Color</Label>
-                    <div className="flex items-center gap-2">
-                        <input
-                            id="color"
-                            type="color"
-                            value={data.color}
-                            onChange={(e) => setData('color', e.target.value)}
-                            className="h-9 w-14 cursor-pointer rounded-md border border-input bg-background p-1"
+            <fieldset>
+                <legend className="mb-1.5 text-sm font-medium">Color</legend>
+                <div className="flex flex-wrap gap-2">
+                    {GEOFENCE_SWATCHES.map((hex) => (
+                        <button
+                            key={hex}
+                            type="button"
+                            aria-label={`Colour ${hex}`}
+                            aria-pressed={data.color === hex}
+                            onClick={() => setData('color', hex)}
+                            className={cn(
+                                'size-8 rounded-full ring-offset-2 ring-offset-card focus-visible:outline-2 focus-visible:outline-ring',
+                                data.color === hex && 'ring-2 ring-foreground',
+                            )}
+                            style={{ background: hex }}
                         />
-                        <span className="font-mono text-sm text-muted-foreground">
-                            {data.color}
-                        </span>
-                    </div>
-                    <InputError message={errors.color} />
+                    ))}
                 </div>
+                <InputError message={errors.color} />
+            </fieldset>
 
-                <div className="grid gap-2">
-                    <Label htmlFor="zone_type">Zone Type</Label>
-                    <Select
-                        value={data.zone_type}
-                        onValueChange={(v) => setData('zone_type', v)}
-                    >
-                        <SelectTrigger id="zone_type">
-                            <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">General</SelectItem>
-                            <SelectItem value="loading">
-                                Loading Zone
-                            </SelectItem>
-                            <SelectItem value="dumping">
-                                Dumping Zone
-                            </SelectItem>
-                            <SelectItem value="parking">
-                                Parking Zone
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <InputError message={errors.zone_type} />
-                </div>
-            </div>
-
-            <div className="grid gap-2">
-                <Label>Polygon Zone</Label>
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onDrawClick}
-                    className="w-full justify-start gap-2"
-                >
-                    <MapPin className="h-4 w-4" />
-                    {data.polygon.length >= 3
-                        ? `Zone set (${data.polygon.length} vertices) — click to redraw`
-                        : 'Draw zone on map'}
-                </Button>
-                <InputError message={errors.polygon} />
-            </div>
+            <label className="flex min-h-9 items-center gap-2.5 text-sm">
+                <Switch
+                    checked={data.is_active}
+                    onCheckedChange={(v) => setData('is_active', v)}
+                />
+                Active · alert on enter / exit
+            </label>
 
             <div className="flex items-center gap-2">
-                <Checkbox
-                    id="is_active"
-                    checked={data.is_active}
-                    onCheckedChange={(v) => setData('is_active', Boolean(v))}
-                />
-                <Label htmlFor="is_active">Active</Label>
-            </div>
-        </div>
-    );
-}
-
-// ---- Create dialog ----
-function CreateGeofenceDialog({ tilesets }: { tilesets: Tileset[] }) {
-    const [open, setOpen] = useState(false);
-    const [mapOpen, setMapOpen] = useState(false);
-
-    const { data, setData, post, processing, errors, reset } =
-        useForm<GeofenceFormData>({
-            name: '',
-            description: '',
-            color: '#f59e0b',
-            polygon: [],
-            is_active: true,
-            zone_type: 'none',
-        });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        post(GeofenceController.store.url(), {
-            preserveScroll: true,
-            onSuccess: () => {
-                setOpen(false);
-                reset();
-            },
-        });
-    };
-
-    return (
-        <>
-            <Button onClick={() => setOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Zone
-            </Button>
-
-            <PolygonMapDialog
-                open={mapOpen}
-                initialPoints={data.polygon}
-                color={data.color}
-                tilesets={tilesets}
-                onClose={() => {
-                    setMapOpen(false);
-                    setOpen(true);
-                }}
-                onConfirm={(pts) => {
-                    setData('polygon', pts);
-                    setMapOpen(false);
-                    setOpen(true);
-                }}
-            />
-
-            <Dialog
-                open={open}
-                onOpenChange={(v) => {
-                    setOpen(v);
-
-                    if (!v) {
-                        reset();
-                    }
-                }}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Add Geofence Zone</DialogTitle>
-                        <DialogDescription>
-                            Draw a polygon zone and configure alert triggers.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form id="create-geofence-form" onSubmit={handleSubmit}>
-                        <GeofenceFormFields
-                            data={data}
-                            setData={(k, v) => setData(k, v as never)}
-                            errors={errors}
-                            onDrawClick={() => {
-                                setOpen(false);
-                                setMapOpen(true);
-                            }}
-                        />
-                    </form>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            form="create-geofence-form"
-                            disabled={processing}
-                        >
-                            Create Zone
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
-    );
-}
-
-// ---- Edit dialog ----
-function EditGeofenceDialog({
-    geofence,
-    tilesets,
-}: {
-    geofence: GeofenceRow;
-    tilesets: Tileset[];
-}) {
-    const [open, setOpen] = useState(false);
-    const [mapOpen, setMapOpen] = useState(false);
-
-    const { data, setData, put, processing, errors, reset } =
-        useForm<GeofenceFormData>({
-            name: geofence.name,
-            description: geofence.description ?? '',
-            color: geofence.color,
-            polygon: geofence.polygon,
-            is_active: geofence.is_active,
-            zone_type: geofence.zone_type,
-        });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        put(GeofenceController.update.url(geofence.id), {
-            preserveScroll: true,
-            onSuccess: () => setOpen(false),
-        });
-    };
-
-    const handleOpen = () => {
-        setData({
-            name: geofence.name,
-            description: geofence.description ?? '',
-            color: geofence.color,
-            polygon: geofence.polygon,
-            is_active: geofence.is_active,
-            zone_type: geofence.zone_type,
-        });
-        setOpen(true);
-    };
-
-    return (
-        <>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={handleOpen}
-            >
-                <Pencil className="h-4 w-4" />
-                <span className="sr-only">Edit</span>
-            </Button>
-
-            <PolygonMapDialog
-                open={mapOpen}
-                initialPoints={data.polygon}
-                color={data.color}
-                tilesets={tilesets}
-                onClose={() => {
-                    setMapOpen(false);
-                    setOpen(true);
-                }}
-                onConfirm={(pts) => {
-                    setData('polygon', pts);
-                    setMapOpen(false);
-                    setOpen(true);
-                }}
-            />
-
-            <Dialog
-                open={open}
-                onOpenChange={(v) => {
-                    setOpen(v);
-
-                    if (!v) {
-                        reset();
-                    }
-                }}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Edit Geofence Zone</DialogTitle>
-                        <DialogDescription>
-                            Update zone configuration for{' '}
-                            <strong>{geofence.name}</strong>.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <form
-                        id={`edit-geofence-form-${geofence.id}`}
-                        onSubmit={handleSubmit}
+                {zone && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={remove}
+                        aria-label="Delete zone"
+                        className="text-danger hover:text-danger"
                     >
-                        <GeofenceFormFields
-                            data={data}
-                            setData={(k, v) => setData(k, v as never)}
-                            errors={errors}
-                            onDrawClick={() => {
-                                setOpen(false);
-                                setMapOpen(true);
-                            }}
-                        />
-                    </form>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            form={`edit-geofence-form-${geofence.id}`}
-                            disabled={processing}
-                        >
-                            Save Changes
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
+                        <Trash2 className="size-4" />
+                    </Button>
+                )}
+                <div className="ml-auto flex gap-2">
+                    <Button type="button" variant="outline" onClick={onCancel}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={processing || vertices < 3}>
+                        Save zone
+                    </Button>
+                </div>
+            </div>
+        </form>
     );
 }
 
-// ---- Delete dialog ----
-function DeleteGeofenceDialog({ geofence }: { geofence: GeofenceRow }) {
-    const [open, setOpen] = useState(false);
-    const { delete: destroy, processing } = useForm({});
+export default function GeofencesIndex({ geofences }: PageProps) {
+    const [search, setSearch] = useState('');
+    const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [draft, setDraft] = useState<Draft>(null);
+    const [tool, setTool] = useState<Tool>(null);
+    const [history, setHistory] = useState<LatLng[][]>([]);
+    const [cursor, setCursor] = useState<LatLng | null>(null);
 
-    return (
-        <>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={() => setOpen(true)}
-            >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Delete</span>
-            </Button>
+    const form = useForm<ZoneForm>(EMPTY_ZONE);
+    const points = form.data.polygon;
+    const color = form.data.color;
+    const drafting = draft !== null;
+    const lastPoint = points.at(-1);
 
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Delete Zone</DialogTitle>
-                        <DialogDescription>
-                            Delete geofence zone{' '}
-                            <strong>{geofence.name}</strong>? All device states
-                            for this zone will also be removed. This cannot be
-                            undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            disabled={processing}
-                            onClick={() =>
-                                destroy(
-                                    GeofenceController.destroy.url(geofence.id),
-                                    {
-                                        preserveScroll: true,
-                                        onSuccess: () => setOpen(false),
-                                    },
-                                )
-                            }
-                        >
-                            Delete
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
-    );
-}
+    const selected = geofences.find((g) => g.id === selectedId);
+    const editingZone =
+        draft?.id != null
+            ? (geofences.find((g) => g.id === draft.id) ?? null)
+            : null;
+    const filtered = useMemo(() => {
+        const needle = search.trim().toLowerCase();
 
-// ---- Page ----
-export default function GeofencesIndex({ geofences, tilesets }: PageProps) {
+        return geofences.filter(
+            (g) => needle === '' || g.name.toLowerCase().includes(needle),
+        );
+    }, [geofences, search]);
+
+    const setPolygon = (next: LatLng[]) => {
+        setHistory((h) => [...h, points]);
+        form.setData('polygon', next);
+    };
+
+    const startNew = () => {
+        form.clearErrors();
+        form.setData(EMPTY_ZONE);
+        setHistory([]);
+        setSelectedId(null);
+        setDraft({ id: null });
+        setTool('draw');
+    };
+
+    const startEdit = (zone: GeofenceRow) => {
+        form.clearErrors();
+        form.setData({
+            name: zone.name,
+            description: zone.description ?? '',
+            color: zone.color,
+            polygon: zone.polygon,
+            is_active: zone.is_active,
+            zone_type: zone.zone_type,
+        });
+        setHistory([]);
+        setSelectedId(zone.id);
+        setDraft({ id: zone.id });
+        setTool(null);
+    };
+
+    const stopEditing = () => {
+        setDraft(null);
+        setTool(null);
+        setCursor(null);
+    };
+
+    const undo = () => {
+        const previous = history.at(-1);
+
+        if (previous) {
+            setHistory((h) => h.slice(0, -1));
+            form.setData('polygon', previous);
+        }
+    };
+
+    const toggleActive = (zone: GeofenceRow, isActive: boolean) => {
+        router.put(
+            GeofenceController.update.url(zone.id),
+            {
+                name: zone.name,
+                description: zone.description ?? '',
+                color: zone.color,
+                polygon: zone.polygon,
+                zone_type: zone.zone_type,
+                is_active: isActive,
+            },
+            { preserveScroll: true, preserveState: true },
+        );
+    };
+
+    const toolButton =
+        'grid size-10 place-items-center rounded-lg text-foreground hover:bg-muted disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-ring aria-pressed:bg-accent aria-pressed:text-accent-foreground';
+
     return (
         <>
             <Head title="Geofences" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-5 p-4 md:p-7">
+                <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            Geofence Zones
+                        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
+                            Geofences
                         </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Draw polygon zones on the map. Set zone type
-                            (Loading/Dumping/Parking) to enable Cycle Time
-                            detection.
+                        <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                            {geofences.length} zone
+                            {geofences.length === 1 ? '' : 's'} ·{' '}
+                            {geofences.filter((g) => g.is_active).length} active
                         </p>
                     </div>
-                    <CreateGeofenceDialog tilesets={tilesets} />
+                    <Button
+                        onClick={startNew}
+                        className="h-11 shrink-0 md:h-10"
+                    >
+                        <Plus className="size-4" /> Draw new zone
+                    </Button>
                 </div>
 
-                <div className="rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Zone</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Color</TableHead>
-                                <TableHead>Vertices</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead />
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {geofences.length ? (
-                                geofences.map((g) => (
-                                    <TableRow key={g.id}>
-                                        <TableCell>
-                                            <div className="font-medium">
-                                                {g.name}
-                                            </div>
-                                            {g.description && (
-                                                <div className="text-xs text-muted-foreground">
-                                                    {g.description}
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge
-                                                variant={
-                                                    ZONE_TYPE_VARIANT[
-                                                        g.zone_type
-                                                    ] ?? 'secondary'
-                                                }
-                                            >
-                                                {ZONE_TYPE_LABELS[
-                                                    g.zone_type
-                                                ] ?? 'General'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                <span
-                                                    className="inline-block h-4 w-4 rounded-sm border"
-                                                    style={{
-                                                        background: g.color,
-                                                    }}
-                                                />
-                                                <span className="font-mono text-xs text-muted-foreground">
-                                                    {g.color}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{g.vertex_count}</TableCell>
-                                        <TableCell>
-                                            {g.is_active ? (
-                                                <Badge variant="online">
-                                                    Active
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="offline">
-                                                    Inactive
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center justify-end gap-1">
-                                                <EditGeofenceDialog
-                                                    geofence={g}
-                                                    tilesets={tilesets}
-                                                />
-                                                <DeleteGeofenceDialog
-                                                    geofence={g}
-                                                />
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell
-                                        colSpan={6}
-                                        className="h-24 text-center text-muted-foreground"
+                <div className="grid gap-5 lg:h-[calc(100svh-15rem)] lg:min-h-[560px] lg:grid-cols-[360px_minmax(0,1fr)]">
+                    {/* Zone list */}
+                    <section className="flex max-h-[50svh] min-h-0 flex-col overflow-hidden rounded-xl border bg-card lg:max-h-none">
+                        <div className="border-b p-4">
+                            <label className="relative block">
+                                <span className="sr-only">Search zones</span>
+                                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    type="search"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search zones…"
+                                    className="h-10 pl-9"
+                                />
+                            </label>
+                        </div>
+                        <ul className="min-h-0 flex-1 overflow-y-auto">
+                            {geofences.length === 0 ? (
+                                <li>
+                                    <EmptyState
+                                        icon={<Hexagon className="size-6" />}
+                                        title="No zones yet"
                                     >
-                                        No geofence zones configured. Add one to
-                                        start monitoring device boundaries.
-                                    </TableCell>
-                                </TableRow>
+                                        Draw loading, dumping and parking zones
+                                        to unlock cycle-time reports.
+                                    </EmptyState>
+                                </li>
+                            ) : (
+                                filtered.map((zone) => (
+                                    <li
+                                        key={zone.id}
+                                        className={cn(
+                                            'flex items-center gap-3 border-b px-4 py-3',
+                                            selectedId === zone.id &&
+                                                'bg-accent shadow-[inset_3px_0_0_var(--primary)]',
+                                        )}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => startEdit(zone)}
+                                            className="flex min-h-11 min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-ring"
+                                        >
+                                            <span
+                                                aria-hidden
+                                                className="size-8 shrink-0 rounded-lg border-2"
+                                                style={{
+                                                    borderColor: zone.color,
+                                                    background: `color-mix(in oklch, ${zone.color} 22%, transparent)`,
+                                                }}
+                                            />
+                                            <span className="min-w-0">
+                                                <span className="block truncate font-semibold">
+                                                    {zone.name}
+                                                </span>
+                                                <span className="block truncate text-xs text-muted-foreground tabular-nums">
+                                                    {TYPE_LABEL[zone.zone_type]}{' '}
+                                                    · {zone.vertex_count}{' '}
+                                                    vertices ·{' '}
+                                                    {zone.units_inside} units
+                                                    inside
+                                                </span>
+                                            </span>
+                                        </button>
+                                        <Switch
+                                            checked={zone.is_active}
+                                            onCheckedChange={(v) =>
+                                                toggleActive(zone, v)
+                                            }
+                                            aria-label={`${zone.name} active`}
+                                        />
+                                    </li>
+                                ))
                             )}
-                        </TableBody>
-                    </Table>
+                        </ul>
+                    </section>
+
+                    {/* Map */}
+                    <section className="relative isolate h-[70svh] overflow-hidden rounded-xl border bg-muted lg:h-auto">
+                        <MapContainer
+                            center={DEFAULT_CENTER}
+                            zoom={15}
+                            zoomControl={false}
+                            style={{ position: 'absolute', inset: 0 }}
+                        >
+                            <TileLayer
+                                url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                                attribution="Tiles &copy; Esri"
+                                maxZoom={19}
+                            />
+                            <FitZones zones={geofences} />
+                            <FocusZone zone={selected} />
+                            <DrawHandler
+                                active={tool === 'draw'}
+                                onAdd={(p) => setPolygon([...points, p])}
+                                onClose={() => setTool(null)}
+                                onCursor={setCursor}
+                            />
+
+                            {geofences
+                                .filter((z) => z.id !== draft?.id)
+                                .map((zone) => (
+                                    <Polygon
+                                        key={zone.id}
+                                        positions={toLatLngs(zone.polygon)}
+                                        pathOptions={{
+                                            color: zone.color,
+                                            fillColor: zone.color,
+                                            fillOpacity: zone.is_active
+                                                ? 0.18
+                                                : 0.06,
+                                            weight:
+                                                selectedId === zone.id
+                                                    ? 2.5
+                                                    : 1.5,
+                                            dashArray: '6 4',
+                                            opacity: zone.is_active ? 1 : 0.5,
+                                        }}
+                                        eventHandlers={{
+                                            click: () => {
+                                                if (!drafting) {
+                                                    startEdit(zone);
+                                                }
+                                            },
+                                        }}
+                                    >
+                                        <Tooltip
+                                            sticky
+                                            className="orion-zone-label"
+                                        >
+                                            {zone.name}
+                                        </Tooltip>
+                                    </Polygon>
+                                ))}
+
+                            {drafting && points.length >= 3 && (
+                                <Polygon
+                                    positions={toLatLngs(points)}
+                                    pathOptions={{
+                                        color,
+                                        fillColor: color,
+                                        fillOpacity: 0.22,
+                                        weight: 2,
+                                    }}
+                                    interactive={false}
+                                />
+                            )}
+                            {drafting && points.length === 2 && (
+                                <Polyline
+                                    positions={toLatLngs(points)}
+                                    pathOptions={{ color, weight: 2 }}
+                                    interactive={false}
+                                />
+                            )}
+                            {tool === 'draw' && cursor && lastPoint && (
+                                <Polyline
+                                    positions={[
+                                        [lastPoint.lat, lastPoint.lng],
+                                        [cursor.lat, cursor.lng],
+                                    ]}
+                                    pathOptions={{
+                                        color,
+                                        weight: 1.5,
+                                        dashArray: '4 4',
+                                    }}
+                                    interactive={false}
+                                />
+                            )}
+                            {drafting &&
+                                tool !== 'edit' &&
+                                points.map((p, i) => (
+                                    <CircleMarker
+                                        key={i}
+                                        center={[p.lat, p.lng]}
+                                        radius={i === points.length - 1 ? 7 : 5}
+                                        pathOptions={{
+                                            color,
+                                            weight: 2,
+                                            fillColor: '#fff',
+                                            fillOpacity: 1,
+                                        }}
+                                        interactive={false}
+                                    />
+                                ))}
+                            {drafting &&
+                                tool === 'edit' &&
+                                points.map((p, i) => (
+                                    <Marker
+                                        key={`${i}-${p.lat}-${p.lng}`}
+                                        position={[p.lat, p.lng]}
+                                        icon={vertexIcon(color)}
+                                        draggable
+                                        eventHandlers={{
+                                            dragend: (e) => {
+                                                const ll = (
+                                                    e.target as L.Marker
+                                                ).getLatLng();
+                                                setPolygon(
+                                                    points.map((q, j) =>
+                                                        j === i
+                                                            ? {
+                                                                  lat: ll.lat,
+                                                                  lng: ll.lng,
+                                                              }
+                                                            : q,
+                                                    ),
+                                                );
+                                            },
+                                        }}
+                                    />
+                                ))}
+                        </MapContainer>
+
+                        {drafting && (
+                            <div
+                                role="toolbar"
+                                aria-label="Drawing tools"
+                                className={cn(
+                                    MAP_CARD,
+                                    'absolute top-4 left-4 z-[1000] flex gap-1 p-1',
+                                )}
+                            >
+                                <button
+                                    type="button"
+                                    className={toolButton}
+                                    aria-pressed={tool === 'draw'}
+                                    aria-label="Draw polygon (click to add vertices)"
+                                    onClick={() =>
+                                        setTool(tool === 'draw' ? null : 'draw')
+                                    }
+                                >
+                                    <Hexagon className="size-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    className={toolButton}
+                                    aria-pressed={tool === 'edit'}
+                                    aria-label="Edit vertices (drag to move)"
+                                    disabled={points.length === 0}
+                                    onClick={() =>
+                                        setTool(tool === 'edit' ? null : 'edit')
+                                    }
+                                >
+                                    <Pencil className="size-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    className={toolButton}
+                                    aria-label="Undo last change"
+                                    disabled={history.length === 0}
+                                    onClick={undo}
+                                >
+                                    <Undo2 className="size-4" />
+                                </button>
+                            </div>
+                        )}
+
+                        {drafting && (
+                            <div className="absolute top-4 right-4 bottom-4 z-[1000] max-w-[calc(100%-2rem)] overflow-y-auto max-lg:top-auto max-lg:right-2 max-lg:bottom-2 max-lg:left-2 max-lg:max-h-[65%] max-lg:[&>form]:w-full">
+                                <ZoneEditor
+                                    key={draft.id ?? 'new'}
+                                    zone={editingZone}
+                                    form={form}
+                                    tool={tool}
+                                    onCancel={stopEditing}
+                                    onSaved={stopEditing}
+                                />
+                            </div>
+                        )}
+                    </section>
                 </div>
             </div>
         </>

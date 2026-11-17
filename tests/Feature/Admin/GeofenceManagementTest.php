@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Device;
 use App\Models\Geofence;
+use App\Models\GeofenceDeviceState;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -104,4 +106,23 @@ it('geofences index lists all zones', function () {
             ->component('admin/geofences/index')
             ->has('geofences', 3)
         );
+});
+
+it('reports how many units are inside each zone', function () {
+    $zone = Geofence::factory()->create();
+    $empty = Geofence::factory()->create();
+    foreach ([true, true, false] as $inside) {
+        GeofenceDeviceState::create([
+            'geofence_id' => $zone->id,
+            'dev_eui' => Device::factory()->create()->dev_eui,
+            'is_inside' => $inside,
+            'checked_at' => now(),
+        ]);
+    }
+
+    $this->actingAs($this->admin)
+        ->get(route('admin.geofences.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('geofences', fn ($rows) => collect($rows)->firstWhere('id', $zone->id)['units_inside'] === 2
+                && collect($rows)->firstWhere('id', $empty->id)['units_inside'] === 0));
 });
