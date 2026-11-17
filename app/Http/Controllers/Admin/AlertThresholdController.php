@@ -18,7 +18,7 @@ class AlertThresholdController extends Controller
     public function index(): Response
     {
         $thresholds = AlertThreshold::query()
-            ->with('device:dev_eui,device_name')
+            ->with('device:dev_eui,device_name,unit_type,unit_model')
             ->orderBy('alert_type')
             ->orderBy('unit_type')
             ->orderBy('dev_eui')
@@ -26,7 +26,7 @@ class AlertThresholdController extends Controller
 
         $devices = Device::query()
             ->orderBy('device_name')
-            ->get(['dev_eui', 'device_name']);
+            ->get(['dev_eui', 'device_name', 'unit_type', 'unit_model']);
 
         $thresholdableTypes = collect(AlertType::cases())
             ->filter(fn (AlertType $t) => $t->hasThreshold())
@@ -45,6 +45,8 @@ class AlertThresholdController extends Controller
                 'threshold_unit' => $t->alert_type->thresholdUnit(),
                 'dev_eui' => $t->dev_eui,
                 'device_name' => $t->device?->device_name,
+                'device_unit_type' => $t->device?->unit_type,
+                'device_unit_model' => $t->device?->unit_model,
                 'unit_type' => $t->unit_type,
                 'threshold_value' => $t->threshold_value,
                 'is_active' => $t->is_active,
@@ -53,7 +55,11 @@ class AlertThresholdController extends Controller
             'devices' => $devices->map(fn (Device $d) => [
                 'dev_eui' => $d->dev_eui,
                 'device_name' => $d->device_name,
+                'unit_type' => $d->unit_type,
+                'unit_model' => $d->unit_model,
             ]),
+            // Devices per unit type, for the "this rule overrides it for N units" hint.
+            'unitTypeCounts' => $devices->countBy('unit_type')->all(),
             'alertTypes' => $thresholdableTypes,
             'unitTypes' => collect(UnitTypes::categories())->map(fn ($meta, $key) => [
                 'value' => $key,

@@ -119,3 +119,18 @@ it('operator cannot delete a threshold', function () {
         ->delete("/admin/alert-thresholds/{$threshold->id}")
         ->assertForbidden();
 });
+
+it('exposes device unit info and device counts per unit type', function () {
+    $truck = Device::factory()->create(['unit_type' => 'oht', 'unit_model' => 'HD785']);
+    Device::factory()->create(['unit_type' => 'oht']);
+    Device::factory()->create(['unit_type' => 'dt']);
+    AlertThreshold::factory()->create(['alert_type' => 'overspeed', 'dev_eui' => $truck->dev_eui, 'threshold_value' => 35]);
+
+    $this->actingAs(User::factory()->admin()->create())
+        ->get('/admin/alert-thresholds')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('thresholds.0.device_unit_type', 'oht')
+            ->where('thresholds.0.device_unit_model', 'HD785')
+            ->where('unitTypeCounts.oht', 2)
+            ->where('unitTypeCounts.dt', 1));
+});

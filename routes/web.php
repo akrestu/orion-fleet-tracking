@@ -41,6 +41,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])
         Route::resource('alert-thresholds', AdminAlertThresholdController::class)
             ->except(['show', 'create', 'edit']);
         Route::get('alerts', [AdminAlertController::class, 'index'])->name('alerts.index');
+        Route::post('alerts/resolve-bulk', [AdminAlertController::class, 'resolveMany'])->name('alerts.resolve-many');
         Route::patch('alerts/{alert}/resolve', [AdminAlertController::class, 'resolve'])->name('alerts.resolve');
         Route::delete('alerts/{alert}', [AdminAlertController::class, 'destroy'])->name('alerts.destroy');
         Route::resource('geofences', AdminGeofenceController::class)

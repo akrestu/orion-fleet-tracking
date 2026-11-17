@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Alert;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -42,6 +43,10 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'accessibleGroupIds' => $request->user()?->accessibleGroupIds(),
             ],
+            // Unresolved alert count for the admin Alerts badge (BottomNav); evaluated lazily, null for non-admins.
+            'activeAlertCount' => fn (): ?int => $request->user()?->isAdmin()
+                ? Alert::query()->whereNull('resolved_at')->count()
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

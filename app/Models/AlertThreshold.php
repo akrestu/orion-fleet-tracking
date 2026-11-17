@@ -25,6 +25,9 @@ class AlertThreshold extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * @return BelongsTo<Device, $this>
+     */
     public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class, 'dev_eui', 'dev_eui');

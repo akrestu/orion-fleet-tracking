@@ -91,3 +91,45 @@ it('operator cannot delete an alert', function () {
         ->delete("/admin/alerts/{$alert->id}")
         ->assertForbidden();
 });
+
+it('exposes active counts per type and device unit info', function () {
+    Alert::create(['dev_eui' => $this->device->dev_eui, 'alert_type' => 'overspeed', 'triggered_at' => now()]);
+    Alert::create(['dev_eui' => $this->device->dev_eui, 'alert_type' => 'overspeed', 'triggered_at' => now()]);
+    Alert::create(['dev_eui' => $this->device->dev_eui, 'alert_type' => 'geofence', 'triggered_at' => now(), 'resolved_at' => now()]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/alerts')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('summary', ['overspeed' => 2, 'geofence' => 0, 'offline' => 0, 'low_signal' => 0])
+            ->where('resolvedLast7Days', 1)
+            ->where('alerts.0.unit_type', $this->device->unit_type)
+            ->where('activeAlertCount', 2));
+});
+
+it('admin can resolve several alerts at once', function () {
+    $a = Alert::create(['dev_eui' => $this->device->dev_eui, 'alert_type' => 'overspeed', 'triggered_at' => now()]);
+    $b = Alert::create(['dev_eui' => $this->device->dev_eui, 'alert_type' => 'offline', 'triggered_at' => now()]);
+    $c = Alert::create(['dev_eui' => $this->device->dev_eui, 'alert_type' => 'offline', 'triggered_at' => now()]);
+
+    $this->actingAs($this->admin)
+        ->post(route('admin.alerts.resolve-many'), ['ids' => [$a->id, $b->id]])
+        ->assertRedirect();
+
+    expect($a->fresh()->resolved_at)->not->toBeNull()
+        ->and($b->fresh()->resolved_at)->not->toBeNull()
+        ->and($c->fresh()->resolved_at)->toBeNull();
+});
+
+it('operator cannot bulk resolve alerts and sees no alert count', function () {
+    $a = Alert::create(['dev_eui' => $this->device->dev_eui, 'alert_type' => 'overspeed', 'triggered_at' => now()]);
+
+    $this->actingAs($this->operator)
+        ->post(route('admin.alerts.resolve-many'), ['ids' => [$a->id]])
+        ->assertForbidden();
+
+    $this->actingAs($this->operator)
+        ->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page->where('activeAlertCount', null));
+
+    expect($a->fresh()->resolved_at)->toBeNull();
+});

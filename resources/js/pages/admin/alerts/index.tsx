@@ -1,538 +1,721 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
-    flexRender,
-    getCoreRowModel,
-    getFilteredRowModel,
-    getPaginationRowModel,
-    getSortedRowModel,
-    useReactTable,
-} from '@tanstack/react-table';
-import type { ColumnDef, SortingState } from '@tanstack/react-table';
-import { ArrowUpDown, CheckCircle, Trash2, X } from 'lucide-react';
+    BellOff,
+    Download,
+    Gauge,
+    Hexagon,
+    Map as MapIcon,
+    SignalLow,
+    WifiOff,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import AlertController from '@/actions/App/Http/Controllers/Admin/AlertController';
-import { Badge } from '@/components/ui/badge';
-import type { BadgeVariant } from '@/components/ui/badge';
+import { AlertTypeBadge } from '@/components/orion/badges';
+import type { AlertType } from '@/components/orion/badges';
+import { EmptyState, LastSeen } from '@/components/orion/misc';
+import { UnitIcon } from '@/components/orion/unit-icon';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { unitMeta } from '@/lib/orion/unit-types';
+import { cn } from '@/lib/utils';
 import { index as adminAlertsIndex } from '@/routes/admin/alerts';
-
-type AlertType = 'overspeed' | 'geofence' | 'offline' | 'low_signal';
+import { alerts as exportAlerts } from '@/routes/admin/reports/export';
+import fleet from '@/routes/fleet';
+import type { UnitCategory } from '@/types/fleet';
 
 type AdminAlert = {
     id: number;
     dev_eui: string;
     device_name: string | null;
+    unit_type: UnitCategory | null;
+    unit_model: string | null;
     alert_type: AlertType;
-    triggered_at: string | null;
-    triggered_at_human: string | null;
+    triggered_at: string;
     resolved_at: string | null;
     is_resolved: boolean;
     meta: Record<string, unknown> | null;
 };
 
-type DeviceOption = {
-    dev_eui: string;
-    device_name: string;
-};
-
 type PageProps = {
     alerts: AdminAlert[];
-    devices: DeviceOption[];
+    summary: Record<AlertType, number>;
+    resolvedLast7Days: number;
 };
 
-// Alert type carries severity via the same 4-state Orion status vocabulary
-// used for device status everywhere else — overspeed/geofence are threshold
-// breaches (warning), offline matches the status literally, and low signal
-// is a degraded (not yet failed) connection, also a warning.
-const ALERT_TYPE_VARIANT: Record<AlertType, BadgeVariant> = {
-    overspeed: 'warning',
-    geofence: 'warning',
-    offline: 'offline',
-    low_signal: 'warning',
+type TypeFilter = 'all' | AlertType;
+type StatusFilter = 'active' | 'resolved' | 'all';
+
+const ALERT_TYPES: AlertType[] = [
+    'overspeed',
+    'geofence',
+    'offline',
+    'low_signal',
+];
+
+/** Alert-type channel: label, icon, summary tile, value text and mobile accent bar. */
+const TYPE: Record<
+    AlertType,
+    { label: string; icon: LucideIcon; tile: string; text: string; bar: string }
+> = {
+    overspeed: {
+        label: 'Overspeed',
+        icon: Gauge,
+        tile: 'bg-danger-bg text-danger',
+        text: 'text-danger',
+        bar: 'bg-danger',
+    },
+    geofence: {
+        label: 'Geofence',
+        icon: Hexagon,
+        tile: 'bg-warning-bg text-warning',
+        text: 'text-warning',
+        bar: 'bg-warning',
+    },
+    offline: {
+        label: 'Offline',
+        icon: WifiOff,
+        tile: 'bg-offline-bg text-offline',
+        text: 'text-offline',
+        bar: 'bg-offline',
+    },
+    low_signal: {
+        label: 'Low signal',
+        icon: SignalLow,
+        tile: 'bg-warning-bg text-warning',
+        text: 'text-warning',
+        bar: 'bg-warning',
+    },
 };
+const PAGE_SIZE = 10;
+/** LastSeen turns amber when stale; an alert's age is not a freshness problem. */
+const NEVER_STALE = Number.MAX_SAFE_INTEGER;
 
-const ALERT_TYPE_LABEL: Record<AlertType, string> = {
-    overspeed: 'Overspeed',
-    geofence: 'Geofence',
-    offline: 'Offline',
-    low_signal: 'Low Signal',
-};
+function num(v: unknown): number | null {
+    const n = typeof v === 'string' ? Number(v) : v;
 
-function ResolveAlertButton({ alert }: { alert: AdminAlert }) {
-    const { patch, processing } = useForm({});
+    return typeof n === 'number' && Number.isFinite(n) ? n : null;
+}
 
-    if (alert.is_resolved) {
-        return null;
+function str(v: unknown): string | null {
+    return typeof v === 'string' && v !== '' ? v : null;
+}
+
+function formatDuration(minutes: number): string {
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+
+    return h > 0 ? `${h} h ${String(m).padStart(2, '0')} m` : `${m} m`;
+}
+
+/** Human detail + "value / threshold" pair derived from the alert's meta payload. */
+function describe(alert: AdminAlert): {
+    detail: string;
+    value: string | null;
+    threshold: string | null;
+} {
+    const meta = alert.meta ?? {};
+    const place = str(meta.zone) ?? str(meta.location);
+
+    switch (alert.alert_type) {
+        case 'overspeed': {
+            const speed = num(meta.speed_kmh);
+            const limit = num(meta.threshold) ?? num(meta.threshold_kmh);
+
+            return {
+                detail: place ?? 'Speed limit exceeded',
+                value: speed === null ? null : `${speed.toFixed(1)} km/h`,
+                threshold: limit === null ? null : `${limit} km/h`,
+            };
+        }
+
+        case 'geofence': {
+            const event = str(meta.event);
+            const name = str(meta.geofence_name) ?? 'zone';
+
+            return {
+                detail: `${event === 'exit' ? 'Exited' : 'Entered'} ${name}`,
+                value: event,
+                threshold: `zone ${name}`,
+            };
+        }
+
+        case 'offline': {
+            const minutes = num(meta.offline_minutes);
+            const limit = num(meta.threshold);
+
+            return {
+                detail: place ?? 'No uplink',
+                value: minutes === null ? null : formatDuration(minutes),
+                threshold: limit === null ? null : `${limit} min`,
+            };
+        }
+
+        case 'low_signal': {
+            const rssi = num(meta.rssi);
+            const limit = num(meta.threshold);
+
+            return {
+                detail: place ?? 'Weak LoRa signal',
+                value: rssi === null ? null : `${rssi} dBm`,
+                threshold: limit === null ? null : `${limit} dBm`,
+            };
+        }
+    }
+}
+
+/** 24 h WIB clock, e.g. 14:31. */
+function clock(iso: string): string {
+    return new Date(iso).toLocaleTimeString('en-GB', {
+        timeZone: 'Asia/Jakarta',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function Chip({
+    selected,
+    onClick,
+    className,
+    children,
+}: {
+    selected: boolean;
+    onClick: () => void;
+    className?: string;
+    children: ReactNode;
+}) {
+    return (
+        <button
+            type="button"
+            aria-pressed={selected}
+            onClick={onClick}
+            className={cn(
+                'inline-flex h-10 shrink-0 items-center rounded-full border px-4 text-sm whitespace-nowrap tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                selected
+                    ? 'border-foreground bg-foreground text-background'
+                    : 'bg-card hover:bg-muted',
+                className,
+            )}
+        >
+            {children}
+        </button>
+    );
+}
+
+function ValueThreshold({ alert }: { alert: AdminAlert }) {
+    const { value, threshold } = describe(alert);
+
+    if (value === null && threshold === null) {
+        return <span className="text-muted-foreground">—</span>;
     }
 
     return (
-        <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-online hover:text-online"
-            onClick={() =>
-                patch(AlertController.resolve.url(alert.id), {
-                    preserveScroll: true,
-                })
-            }
-            disabled={processing}
-            title="Resolve alert"
-        >
-            <CheckCircle className="h-4 w-4" />
-            <span className="sr-only">Resolve alert</span>
-        </Button>
-    );
-}
-
-function DeleteAlertDialog({ alert }: { alert: AdminAlert }) {
-    const [open, setOpen] = useState(false);
-    const { delete: destroy, processing } = useForm({});
-
-    return (
-        <>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                onClick={() => setOpen(true)}
+        <span className="font-mono text-xs">
+            <span
+                className={cn(
+                    'font-semibold',
+                    !alert.is_resolved && TYPE[alert.alert_type].text,
+                )}
             >
-                <Trash2 className="h-4 w-4" />
-                <span className="sr-only">Delete alert</span>
-            </Button>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Delete Alert</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete this{' '}
-                            <strong>
-                                {ALERT_TYPE_LABEL[alert.alert_type]}
-                            </strong>{' '}
-                            alert? This action cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            disabled={processing}
-                            onClick={() =>
-                                destroy(AlertController.destroy.url(alert.id), {
-                                    preserveScroll: true,
-                                    onSuccess: () => setOpen(false),
-                                })
-                            }
-                        >
-                            Delete
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </>
+                {value ?? '—'}
+            </span>
+            {threshold && (
+                <span className="text-muted-foreground"> / {threshold}</span>
+            )}
+        </span>
     );
 }
 
-export default function AlertsIndex({ alerts, devices }: PageProps) {
-    const [sorting, setSorting] = useState<SortingState>([]);
-    const [globalFilter, setGlobalFilter] = useState('');
-    const [statusFilter, setStatusFilter] = useState<
-        'all' | 'active' | 'resolved'
-    >('all');
-    const [deviceFilter, setDeviceFilter] = useState('all');
-    const [dateFrom, setDateFrom] = useState('');
-    const [dateTo, setDateTo] = useState('');
+function AlertStatus({ resolved }: { resolved: boolean }) {
+    return (
+        <span
+            className={cn(
+                'inline-flex items-center gap-1.5 text-sm',
+                resolved ? 'text-online' : 'text-danger',
+            )}
+        >
+            <span
+                aria-hidden
+                className={cn(
+                    'size-1.5 rounded-full',
+                    resolved ? 'bg-online' : 'bg-danger',
+                )}
+            />
+            {resolved ? 'Resolved' : 'Active'}
+        </span>
+    );
+}
 
-    const hasActiveFilters =
-        statusFilter !== 'all' ||
-        deviceFilter !== 'all' ||
-        dateFrom !== '' ||
-        dateTo !== '' ||
-        globalFilter !== '';
+function deviceLabel(alert: AdminAlert): string {
+    return `${alert.device_name ?? alert.dev_eui}${alert.unit_model ? ` ${alert.unit_model}` : ''}`;
+}
 
-    const filteredAlerts = useMemo(() => {
-        return alerts.filter((a) => {
-            if (statusFilter === 'active' && a.is_resolved) {
-                return false;
-            }
+export default function AlertsIndex({
+    alerts,
+    summary,
+    resolvedLast7Days,
+}: PageProps) {
+    const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
+    const [selected, setSelected] = useState<Set<number>>(new Set());
+    const [page, setPage] = useState(0);
+    const [busy, setBusy] = useState(false);
 
-            if (statusFilter === 'resolved' && !a.is_resolved) {
-                return false;
-            }
+    const activeTotal = ALERT_TYPES.reduce((sum, t) => sum + summary[t], 0);
 
-            if (deviceFilter !== 'all' && a.dev_eui !== deviceFilter) {
-                return false;
-            }
+    const filtered = useMemo(
+        () =>
+            alerts.filter(
+                (a) =>
+                    (typeFilter === 'all' || a.alert_type === typeFilter) &&
+                    (statusFilter === 'all' ||
+                        (statusFilter === 'active') === !a.is_resolved),
+            ),
+        [alerts, typeFilter, statusFilter],
+    );
+    const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const currentPage = Math.min(page, pageCount - 1);
+    const pageRows = filtered.slice(
+        currentPage * PAGE_SIZE,
+        (currentPage + 1) * PAGE_SIZE,
+    );
+    const selectableOnPage = pageRows.filter((a) => !a.is_resolved);
+    const selectedActive = alerts.filter(
+        (a) => selected.has(a.id) && !a.is_resolved,
+    );
+    const allOnPageSelected =
+        selectableOnPage.length > 0 &&
+        selectableOnPage.every((a) => selected.has(a.id));
 
-            if (dateFrom && a.triggered_at && a.triggered_at < dateFrom) {
-                return false;
-            }
-
-            if (
-                dateTo &&
-                a.triggered_at &&
-                a.triggered_at > dateTo + 'T23:59:59'
-            ) {
-                return false;
-            }
-
-            return true;
-        });
-    }, [alerts, statusFilter, deviceFilter, dateFrom, dateTo]);
-
-    const clearFilters = () => {
-        setStatusFilter('all');
-        setDeviceFilter('all');
-        setDateFrom('');
-        setDateTo('');
-        setGlobalFilter('');
+    const changeFilter = (apply: () => void) => {
+        apply();
+        setPage(0);
+        setSelected(new Set());
     };
 
-    const columns: ColumnDef<AdminAlert>[] = [
-        {
-            accessorKey: 'alert_type',
-            header: 'Type',
-            cell: ({ row }) => (
-                <Badge variant={ALERT_TYPE_VARIANT[row.original.alert_type]}>
-                    {ALERT_TYPE_LABEL[row.original.alert_type]}
-                </Badge>
-            ),
-        },
-        {
-            accessorKey: 'device_name',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
-                    }
-                >
-                    Device
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            ),
-            cell: ({ row }) => (
-                <div>
-                    <div className="font-medium">
-                        {row.original.device_name ?? '—'}
-                    </div>
-                    <div className="font-mono text-xs text-muted-foreground">
-                        {row.original.dev_eui}
-                    </div>
-                </div>
-            ),
-        },
-        {
-            accessorKey: 'triggered_at',
-            header: ({ column }) => (
-                <Button
-                    variant="ghost"
-                    className="-ml-3 h-8"
-                    onClick={() =>
-                        column.toggleSorting(column.getIsSorted() === 'asc')
-                    }
-                >
-                    Triggered
-                    <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-            ),
-            cell: ({ row }) => (
-                <span
-                    className="text-sm text-muted-foreground"
-                    title={row.original.triggered_at ?? ''}
-                >
-                    {row.original.triggered_at_human ?? '—'}
-                </span>
-            ),
-        },
-        {
-            accessorKey: 'is_resolved',
-            header: 'Status',
-            cell: ({ row }) =>
-                row.original.is_resolved ? (
-                    <div>
-                        <Badge variant="online">Resolved</Badge>
-                        {row.original.resolved_at && (
-                            <div className="mt-0.5 text-xs text-muted-foreground">
-                                {row.original.resolved_at}
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <Badge variant="danger">Active</Badge>
-                ),
-        },
-        {
-            id: 'actions',
-            header: '',
-            cell: ({ row }) => (
-                <div className="flex items-center justify-end gap-1">
-                    <ResolveAlertButton alert={row.original} />
-                    <DeleteAlertDialog alert={row.original} />
-                </div>
-            ),
-        },
-    ];
+    const toggle = (id: number, on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
 
-    const table = useReactTable({
-        data: filteredAlerts,
-        columns,
-        state: { sorting, globalFilter },
-        onSortingChange: setSorting,
-        onGlobalFilterChange: setGlobalFilter,
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        getPaginationRowModel: getPaginationRowModel(),
-        initialState: { pagination: { pageSize: 20 } },
-    });
+            if (on) {
+                next.add(id);
+            } else {
+                next.delete(id);
+            }
 
-    const activeCount = alerts.filter((a) => !a.is_resolved).length;
+            return next;
+        });
+
+    const togglePage = (on: boolean) =>
+        setSelected((prev) => {
+            const next = new Set(prev);
+            selectableOnPage.forEach((a) =>
+                on ? next.add(a.id) : next.delete(a.id),
+            );
+
+            return next;
+        });
+
+    const visitOptions = {
+        preserveScroll: true,
+        onStart: () => setBusy(true),
+        onFinish: () => setBusy(false),
+    };
+
+    const resolveOne = (alert: AdminAlert) => {
+        router.patch(
+            AlertController.resolve.url(alert.id),
+            {},
+            { ...visitOptions, onSuccess: () => toggle(alert.id, false) },
+        );
+    };
+
+    const resolveSelected = () => {
+        router.post(
+            AlertController.resolveMany.url(),
+            { ids: selectedActive.map((a) => a.id) },
+            { ...visitOptions, onSuccess: () => setSelected(new Set()) },
+        );
+    };
+
+    const firstRow = filtered.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+    const lastRow = Math.min(filtered.length, (currentPage + 1) * PAGE_SIZE);
+    const empty = (
+        <EmptyState
+            icon={<BellOff className="size-6" />}
+            title={
+                statusFilter === 'active'
+                    ? 'No active alerts'
+                    : 'No alerts match'
+            }
+        >
+            {statusFilter === 'active'
+                ? 'Every alert has been handled.'
+                : 'Try another type or status.'}
+        </EmptyState>
+    );
 
     return (
         <>
             <Head title="Alert Management" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-auto p-6">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-5 p-4 md:p-7">
+                <div className="flex items-start justify-between gap-4">
                     <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            Alert Management
+                        <h1 className="text-2xl font-semibold tracking-tight md:text-[28px]">
+                            <span className="md:hidden">Alerts</span>
+                            <span className="hidden md:inline">
+                                Alert Management
+                            </span>
                         </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {activeCount > 0 ? (
-                                <>
-                                    <span className="font-medium text-danger">
-                                        {activeCount} active
-                                    </span>{' '}
-                                    alert
-                                    {activeCount !== 1 ? 's' : ''} requiring
-                                    attention.
-                                </>
-                            ) : (
-                                'All alerts have been resolved.'
-                            )}
+                        <p className="mt-1 hidden text-sm text-muted-foreground tabular-nums md:block">
+                            {activeTotal} active · {resolvedLast7Days} resolved
+                            in the last 7 days
                         </p>
+                    </div>
+                    <span className="pt-2 text-sm text-muted-foreground tabular-nums md:hidden">
+                        {activeTotal} active
+                    </span>
+                    <div className="hidden gap-2 md:flex">
+                        <Button variant="outline" asChild>
+                            <a href={exportAlerts.url()}>
+                                <Download className="size-4" /> Export
+                            </a>
+                        </Button>
+                        <Button
+                            onClick={resolveSelected}
+                            disabled={selectedActive.length === 0 || busy}
+                        >
+                            Resolve selected ({selectedActive.length})
+                        </Button>
                     </div>
                 </div>
 
-                <div className="flex flex-col gap-4">
-                    {/* Filters */}
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="flex flex-col gap-1">
-                            <Label className="text-xs text-muted-foreground">
-                                Search
-                            </Label>
-                            <Input
-                                placeholder="Search by device, type..."
-                                value={globalFilter}
-                                onChange={(e) =>
-                                    setGlobalFilter(e.target.value)
-                                }
-                                className="w-52"
-                            />
-                        </div>
+                {/* Summary cards (desktop) — click to filter */}
+                <div className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-4">
+                    {ALERT_TYPES.map((type) => {
+                        const Icon = TYPE[type].icon;
 
-                        <div className="flex flex-col gap-1">
-                            <Label className="text-xs text-muted-foreground">
-                                Status
-                            </Label>
-                            <Select
-                                value={statusFilter}
-                                onValueChange={(v) =>
-                                    setStatusFilter(v as typeof statusFilter)
+                        return (
+                            <button
+                                key={type}
+                                type="button"
+                                aria-pressed={
+                                    typeFilter === type &&
+                                    statusFilter === 'active'
                                 }
+                                onClick={() =>
+                                    changeFilter(() => {
+                                        setTypeFilter(type);
+                                        setStatusFilter('active');
+                                    })
+                                }
+                                className="flex items-center gap-4 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-ring aria-pressed:border-primary/40"
                             >
-                                <SelectTrigger className="w-36">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All statuses
-                                    </SelectItem>
-                                    <SelectItem value="active">
-                                        Active only
-                                    </SelectItem>
-                                    <SelectItem value="resolved">
-                                        Resolved only
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                                <span
+                                    className={cn(
+                                        'grid size-11 shrink-0 place-items-center rounded-xl',
+                                        TYPE[type].tile,
+                                    )}
+                                >
+                                    <Icon className="size-5" aria-hidden />
+                                </span>
+                                <span>
+                                    <span className="block text-2xl font-semibold tabular-nums">
+                                        {summary[type]}
+                                    </span>
+                                    <span className="text-sm text-muted-foreground">
+                                        {TYPE[type].label} · active
+                                    </span>
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
 
-                        <div className="flex flex-col gap-1">
-                            <Label className="text-xs text-muted-foreground">
-                                Device
-                            </Label>
-                            <Select
-                                value={deviceFilter}
-                                onValueChange={setDeviceFilter}
-                            >
-                                <SelectTrigger className="w-48">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All devices
-                                    </SelectItem>
-                                    {devices.map((d) => (
-                                        <SelectItem
-                                            key={d.dev_eui}
-                                            value={d.dev_eui}
+                {/* Filters */}
+                <div className="-mx-4 flex [scrollbar-width:none] items-center gap-2 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0 [&::-webkit-scrollbar]:hidden">
+                    <span className="hidden text-sm text-muted-foreground md:inline">
+                        Type
+                    </span>
+                    <Chip
+                        selected={typeFilter === 'all'}
+                        onClick={() => changeFilter(() => setTypeFilter('all'))}
+                    >
+                        <span className="md:hidden">Active</span>
+                        <span className="hidden md:inline">Semua</span>
+                    </Chip>
+                    {ALERT_TYPES.map((type) => (
+                        <Chip
+                            key={type}
+                            selected={typeFilter === type}
+                            onClick={() =>
+                                changeFilter(() => setTypeFilter(type))
+                            }
+                        >
+                            {TYPE[type].label}
+                            <span className="ml-1.5 md:hidden">
+                                {summary[type]}
+                            </span>
+                        </Chip>
+                    ))}
+                    <span
+                        aria-hidden
+                        className="mx-1 hidden h-6 border-l md:inline"
+                    />
+                    <span className="hidden text-sm text-muted-foreground md:inline">
+                        Status
+                    </span>
+                    {(
+                        [
+                            ['active', 'Active'],
+                            ['resolved', 'Resolved'],
+                            ['all', 'Semua'],
+                        ] as const
+                    ).map(([value, label]) => (
+                        <Chip
+                            key={value}
+                            selected={statusFilter === value}
+                            onClick={() =>
+                                changeFilter(() => setStatusFilter(value))
+                            }
+                            className="hidden md:inline-flex"
+                        >
+                            {label}
+                        </Chip>
+                    ))}
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden overflow-hidden rounded-xl border bg-card md:block">
+                    {filtered.length === 0 ? (
+                        empty
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead className="bg-sidebar text-left text-muted-foreground">
+                                    <tr className="h-[38px] [&>th]:px-3 [&>th]:font-medium [&>th]:whitespace-nowrap">
+                                        <th className="w-10 pl-4!">
+                                            <Checkbox
+                                                checked={allOnPageSelected}
+                                                disabled={
+                                                    selectableOnPage.length ===
+                                                    0
+                                                }
+                                                onCheckedChange={(v) =>
+                                                    togglePage(v === true)
+                                                }
+                                                aria-label="Select all active alerts on this page"
+                                            />
+                                        </th>
+                                        <th>Type</th>
+                                        <th>Device</th>
+                                        <th>Detail</th>
+                                        <th className="text-right">
+                                            Value / threshold
+                                        </th>
+                                        <th aria-sort="descending">
+                                            Triggered
+                                        </th>
+                                        <th>Status</th>
+                                        <th>
+                                            <span className="sr-only">
+                                                Actions
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pageRows.map((alert) => (
+                                        <tr
+                                            key={alert.id}
+                                            className={cn(
+                                                'h-14 border-t transition-colors hover:bg-muted/40 [&>td]:px-3',
+                                                selected.has(alert.id) &&
+                                                    'bg-accent/50',
+                                            )}
                                         >
-                                            {d.device_name}
-                                        </SelectItem>
+                                            <td className="pl-4!">
+                                                <Checkbox
+                                                    checked={selected.has(
+                                                        alert.id,
+                                                    )}
+                                                    disabled={alert.is_resolved}
+                                                    onCheckedChange={(v) =>
+                                                        toggle(
+                                                            alert.id,
+                                                            v === true,
+                                                        )
+                                                    }
+                                                    aria-label={`Select ${TYPE[alert.alert_type].label} alert for ${deviceLabel(alert)}`}
+                                                />
+                                            </td>
+                                            <td>
+                                                <AlertTypeBadge
+                                                    type={alert.alert_type}
+                                                />
+                                            </td>
+                                            <td>
+                                                <span className="inline-flex items-center gap-2 font-semibold whitespace-nowrap">
+                                                    {alert.unit_type && (
+                                                        <UnitIcon
+                                                            type={
+                                                                unitMeta(
+                                                                    alert.unit_type,
+                                                                ).key
+                                                            }
+                                                            size={22}
+                                                        />
+                                                    )}
+                                                    {deviceLabel(alert)}
+                                                </span>
+                                            </td>
+                                            <td className="max-w-64 truncate">
+                                                {describe(alert).detail}
+                                            </td>
+                                            <td className="text-right whitespace-nowrap">
+                                                <ValueThreshold alert={alert} />
+                                            </td>
+                                            <td className="whitespace-nowrap tabular-nums">
+                                                {clock(alert.triggered_at)} ·{' '}
+                                                <LastSeen
+                                                    at={alert.triggered_at}
+                                                    staleAfterSec={NEVER_STALE}
+                                                />
+                                            </td>
+                                            <td>
+                                                <AlertStatus
+                                                    resolved={alert.is_resolved}
+                                                />
+                                            </td>
+                                            <td className="pr-4! text-right">
+                                                {!alert.is_resolved && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={busy}
+                                                        onClick={() =>
+                                                            resolveOne(alert)
+                                                        }
+                                                    >
+                                                        Resolve
+                                                    </Button>
+                                                )}
+                                            </td>
+                                        </tr>
                                     ))}
-                                </SelectContent>
-                            </Select>
+                                </tbody>
+                            </table>
                         </div>
+                    )}
 
-                        <div className="flex flex-col gap-1">
-                            <Label className="text-xs text-muted-foreground">
-                                From date
-                            </Label>
-                            <Input
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => setDateFrom(e.target.value)}
-                                className="w-40"
-                            />
-                        </div>
-
-                        <div className="flex flex-col gap-1">
-                            <Label className="text-xs text-muted-foreground">
-                                To date
-                            </Label>
-                            <Input
-                                type="date"
-                                value={dateTo}
-                                onChange={(e) => setDateTo(e.target.value)}
-                                className="w-40"
-                            />
-                        </div>
-
-                        {hasActiveFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={clearFilters}
-                                className="gap-1 self-end"
-                            >
-                                <X className="h-3.5 w-3.5" />
-                                Clear filters
-                            </Button>
-                        )}
-                    </div>
-
-                    <div className="rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                {table.getHeaderGroups().map((hg) => (
-                                    <TableRow key={hg.id}>
-                                        {hg.headers.map((header) => (
-                                            <TableHead key={header.id}>
-                                                {header.isPlaceholder
-                                                    ? null
-                                                    : flexRender(
-                                                          header.column
-                                                              .columnDef.header,
-                                                          header.getContext(),
-                                                      )}
-                                            </TableHead>
-                                        ))}
-                                    </TableRow>
-                                ))}
-                            </TableHeader>
-                            <TableBody>
-                                {table.getRowModel().rows.length ? (
-                                    table.getRowModel().rows.map((row) => (
-                                        <TableRow key={row.id}>
-                                            {row
-                                                .getVisibleCells()
-                                                .map((cell) => (
-                                                    <TableCell key={cell.id}>
-                                                        {flexRender(
-                                                            cell.column
-                                                                .columnDef.cell,
-                                                            cell.getContext(),
-                                                        )}
-                                                    </TableCell>
-                                                ))}
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={columns.length}
-                                            className="h-24 text-center text-muted-foreground"
-                                        >
-                                            No alerts found.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>
-                            {table.getFilteredRowModel().rows.length} alert(s)
-                            shown
+                    <div className="flex items-center justify-between gap-4 border-t px-4 py-3 text-sm text-muted-foreground">
+                        <span className="tabular-nums">
+                            Showing {firstRow}–{lastRow} of {filtered.length}
+                            {statusFilter === 'all' ? '' : ` ${statusFilter}`}
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => table.previousPage()}
-                                disabled={!table.getCanPreviousPage()}
+                                onClick={() => setPage(currentPage - 1)}
+                                disabled={currentPage === 0}
                             >
                                 Previous
                             </Button>
-                            <span>
-                                Page {table.getState().pagination.pageIndex + 1}{' '}
-                                of {table.getPageCount()}
-                            </span>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => table.nextPage()}
-                                disabled={!table.getCanNextPage()}
+                                onClick={() => setPage(currentPage + 1)}
+                                disabled={currentPage >= pageCount - 1}
                             >
                                 Next
                             </Button>
                         </div>
                     </div>
+                </div>
+
+                {/* Mobile cards (active alerts) */}
+                <div className="-mx-4 flex flex-col gap-3 border-t bg-muted/40 px-4 pt-4 md:hidden">
+                    {filtered.length === 0
+                        ? empty
+                        : filtered.map((alert) => (
+                              <article
+                                  key={alert.id}
+                                  className="relative overflow-hidden rounded-2xl border bg-card p-4 pl-5"
+                              >
+                                  <span
+                                      aria-hidden
+                                      className={cn(
+                                          'absolute inset-y-0 left-0 w-[3px]',
+                                          TYPE[alert.alert_type].bar,
+                                      )}
+                                  />
+                                  <div className="flex items-center justify-between gap-2">
+                                      <AlertTypeBadge type={alert.alert_type} />
+                                      <span className="text-sm">
+                                          <LastSeen
+                                              at={alert.triggered_at}
+                                              staleAfterSec={NEVER_STALE}
+                                          />
+                                      </span>
+                                  </div>
+                                  <div className="mt-3 flex items-center gap-3">
+                                      {alert.unit_type && (
+                                          <UnitIcon
+                                              type={
+                                                  unitMeta(alert.unit_type).key
+                                              }
+                                              variant="tile"
+                                              size={40}
+                                          />
+                                      )}
+                                      <div className="min-w-0 flex-1">
+                                          <p className="truncate font-semibold">
+                                              {deviceLabel(alert)}
+                                          </p>
+                                          <p className="truncate text-sm text-muted-foreground">
+                                              {describe(alert).detail}
+                                          </p>
+                                      </div>
+                                      <span className="max-w-[40%] text-right">
+                                          <ValueThreshold alert={alert} />
+                                      </span>
+                                  </div>
+                                  <div className="mt-4 grid grid-cols-2 gap-3">
+                                      <Button
+                                          variant="outline"
+                                          asChild
+                                          className="h-11"
+                                      >
+                                          <Link
+                                              href={fleet.map.url({
+                                                  query: {
+                                                      device: alert.dev_eui,
+                                                  },
+                                              })}
+                                          >
+                                              <MapIcon className="size-4" />
+                                              Lihat di peta
+                                          </Link>
+                                      </Button>
+                                      {alert.is_resolved ? (
+                                          <span className="grid h-11 place-items-center">
+                                              <AlertStatus resolved />
+                                          </span>
+                                      ) : (
+                                          <Button
+                                              className="h-11"
+                                              disabled={busy}
+                                              onClick={() => resolveOne(alert)}
+                                          >
+                                              Resolve
+                                          </Button>
+                                      )}
+                                  </div>
+                              </article>
+                          ))}
                 </div>
             </div>
         </>

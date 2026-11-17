@@ -27,6 +27,9 @@ class Alert extends Model
         'meta' => 'array',
     ];
 
+    /**
+     * @return BelongsTo<Device, $this>
+     */
     public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class, 'dev_eui', 'dev_eui');

@@ -1,3 +1,4 @@
+import { usePage } from '@inertiajs/react';
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -20,6 +21,9 @@ export default function AppSidebarLayout({
     breadcrumbs = [],
 }: AppLayoutProps) {
     const { currentUrl } = useCurrentUrl();
+    const { activeAlertCount } = usePage<{
+        activeAlertCount?: number | null;
+    }>().props;
     const activeTab = BOTTOM_NAV_PREFIXES.find(([prefix]) =>
         currentUrl.startsWith(prefix),
     )?.[1];
@@ -40,7 +44,7 @@ export default function AppSidebarLayout({
                 {!isFullBleed && <AppSidebarHeader breadcrumbs={breadcrumbs} />}
                 {children}
             </AppContent>
-            <BottomNav active={activeTab} />
+            <BottomNav active={activeTab} alertCount={activeAlertCount ?? 0} />
         </AppShell>
     );
 }
