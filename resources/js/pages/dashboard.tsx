@@ -14,6 +14,7 @@ import type {
     DashboardOptions,
     DashboardSectionData,
 } from '@/components/dashboard/dashboard-panels';
+import { NoGroupState, useHasNoGroups } from '@/components/orion/states';
 import { dashboard } from '@/routes';
 import type { Auth } from '@/types';
 
@@ -61,6 +62,7 @@ export default function Dashboard({
 }: Props) {
     const { auth } = usePage<{ auth: Auth }>().props;
     const isAdmin = auth.user.role === 'admin';
+    const hasNoGroups = useHasNoGroups();
 
     const applyFilters = (patch: Partial<DashboardFilters>) => {
         router.get(dashboard.url(), toQuery({ ...filters, ...patch }), {
@@ -74,34 +76,41 @@ export default function Dashboard({
         <>
             <Head title="Dashboard" />
 
-            <div className="flex flex-col gap-4 p-4 md:gap-5 md:p-7">
-                <DashboardHero hero={hero} />
+            {hasNoGroups ? (
+                <NoGroupState className="min-h-[60svh]" />
+            ) : (
+                <div className="flex flex-col gap-4 p-4 md:gap-5 md:p-7">
+                    <DashboardHero hero={hero} />
 
-                <DashboardFilterBar
-                    filters={filters}
-                    options={options}
-                    onChange={applyFilters}
-                />
+                    <DashboardFilterBar
+                        filters={filters}
+                        options={options}
+                        onChange={applyFilters}
+                    />
 
-                <Deferred data="kpis" fallback={<DashboardKpisSkeleton />}>
-                    {kpis && (
-                        <DashboardKpis kpis={kpis} period={filters.period} />
-                    )}
-                </Deferred>
+                    <Deferred data="kpis" fallback={<DashboardKpisSkeleton />}>
+                        {kpis && (
+                            <DashboardKpis
+                                kpis={kpis}
+                                period={filters.period}
+                            />
+                        )}
+                    </Deferred>
 
-                <Deferred
-                    data="sections"
-                    fallback={<DashboardSectionsSkeleton />}
-                >
-                    {sections && (
-                        <DashboardSections
-                            sections={sections}
-                            period={filters.period}
-                            isAdmin={isAdmin}
-                        />
-                    )}
-                </Deferred>
-            </div>
+                    <Deferred
+                        data="sections"
+                        fallback={<DashboardSectionsSkeleton />}
+                    >
+                        {sections && (
+                            <DashboardSections
+                                sections={sections}
+                                period={filters.period}
+                                isAdmin={isAdmin}
+                            />
+                        )}
+                    </Deferred>
+                </div>
+            )}
         </>
     );
 }

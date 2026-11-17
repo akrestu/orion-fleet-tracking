@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\UserRole;
 use App\Models\Alert;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -46,6 +48,10 @@ class HandleInertiaRequests extends Middleware
             // Unresolved alert count for the admin Alerts badge (BottomNav); evaluated lazily, null for non-admins.
             'activeAlertCount' => fn (): ?int => $request->user()?->isAdmin()
                 ? Alert::query()->whereNull('resolved_at')->count()
+                : null,
+            // Admin contact for the "no device groups assigned" state; only resolved for users without groups.
+            'supportEmail' => fn (): ?string => $request->user()?->accessibleGroupIds() === []
+                ? User::query()->where('role', UserRole::Admin)->orderBy('id')->value('email')
                 : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

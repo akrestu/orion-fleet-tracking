@@ -2,7 +2,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { Head, usePage } from '@inertiajs/react';
 import L from 'leaflet';
-import { Layers, Map as MapIcon, Menu, Search, WifiOff } from 'lucide-react';
+import { Layers, Map as MapIcon, Menu, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { Drawer as DrawerPrimitive } from 'vaul';
@@ -25,6 +25,11 @@ import { RouteHistoryLayer } from '@/components/Fleet/RouteHistoryLayer';
 import { SignalHeatmapLayer } from '@/components/Fleet/SignalHeatmapLayer';
 import { ConnectionBadge } from '@/components/orion/badges';
 import { EmptyState, LastSeen } from '@/components/orion/misc';
+import {
+    LiveConnectionBanner,
+    NoGroupState,
+    useHasNoGroups,
+} from '@/components/orion/states';
 import {
     Popover,
     PopoverContent,
@@ -110,6 +115,7 @@ export default function FleetMap({
     const connection = useLiveConnection();
     const isMobile = useIsMobile();
     const { setOpenMobile } = useSidebar();
+    const hasNoGroups = useHasNoGroups();
 
     const [map, setMap] = useState<L.Map | null>(null);
     // `?device={eui}` (from Device Detail → Show on map) preselects that unit.
@@ -272,6 +278,15 @@ export default function FleetMap({
         'grid size-11 shrink-0 place-items-center focus-visible:outline-2 focus-visible:outline-ring',
     );
 
+    if (hasNoGroups) {
+        return (
+            <>
+                <Head title="Fleet Map" />
+                <NoGroupState className="min-h-svh" />
+            </>
+        );
+    }
+
     return (
         <>
             <Head title="Fleet Map" />
@@ -370,7 +385,12 @@ export default function FleetMap({
                         {mappedDevices.map((device) => (
                             <DeviceMarker
                                 key={device.dev_eui}
-                                device={device}
+                                device={
+                                    // While the live feed is down, every position is stale.
+                                    connection === 'connected'
+                                        ? device
+                                        : { ...device, status: 'offline' }
+                                }
                                 isSelected={selectedDevEui === device.dev_eui}
                                 canOpenDetails={isAdmin}
                                 onSelect={handleSelectDevice}
@@ -462,19 +482,14 @@ export default function FleetMap({
                         </>
                     )}
 
-                    {connection !== 'connected' && (
-                        <div
-                            className={cn(
-                                'absolute left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-2 rounded-full border bg-warning-bg px-3.5 py-1.5 text-xs font-medium whitespace-nowrap text-warning shadow-sm',
-                                isMobile ? 'top-[68px]' : 'top-4',
-                            )}
-                        >
-                            <WifiOff className="size-3.5" />
-                            {connection === 'reconnecting'
-                                ? 'Menyambung ulang… posisi mungkin tertunda'
-                                : 'Live tracking terputus'}
-                        </div>
-                    )}
+                    <LiveConnectionBanner
+                        className={cn(
+                            'absolute z-[1000]',
+                            isMobile
+                                ? 'inset-x-3 top-[68px]'
+                                : 'top-4 left-1/2 w-[min(520px,calc(100%-34rem))] min-w-80 -translate-x-1/2',
+                        )}
+                    />
                 </main>
             </div>
 

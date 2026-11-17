@@ -184,7 +184,7 @@ export function DashboardHero({ hero }: { hero: DashboardHeroData }) {
     const firstName = auth.user.name.split(' ')[0];
 
     return (
-        <section className="relative isolate h-[180px] overflow-hidden rounded-[20px] md:h-[260px]">
+        <section className="relative isolate h-[180px] overflow-hidden rounded-[20px] bg-primary md:h-[260px]">
             <img
                 src="/images/orion/hero-site.jpg"
                 alt=""
@@ -242,7 +242,6 @@ function FilterPill({
     return (
         <DropdownMenu>
             <DropdownMenuTrigger
-                aria-label={ariaLabel}
                 className={cn(
                     'inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium whitespace-nowrap transition-colors duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:h-10',
                     active
@@ -250,6 +249,7 @@ function FilterPill({
                         : 'border border-dashed border-input hover:bg-muted',
                 )}
             >
+                <span className="sr-only">{ariaLabel}: </span>
                 {label}
                 <ChevronDown className="size-4 opacity-70" aria-hidden />
             </DropdownMenuTrigger>

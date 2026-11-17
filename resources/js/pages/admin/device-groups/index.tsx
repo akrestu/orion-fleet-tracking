@@ -568,7 +568,7 @@ export default function DeviceGroupsIndex({
                         </EmptyState>
                     </div>
                 ) : (
-                    <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+                    <div className="grid [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))] gap-4">
                         {groups.map((group) => {
                             const extra = group.users.length - MAX_AVATARS;
 

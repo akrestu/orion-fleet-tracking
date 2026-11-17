@@ -29,7 +29,6 @@ export function DeviceSidebarItem({
             type="button"
             onClick={onClick}
             aria-pressed={isSelected}
-            aria-label={`${device.device_name}, ${statusLabel}`}
             className={cn(
                 'flex min-h-[52px] w-full items-center gap-3 border-b px-4 py-2 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                 isSelected && 'bg-accent shadow-[inset_3px_0_0_var(--primary)]',
@@ -57,6 +56,7 @@ export function DeviceSidebarItem({
                 {isOnline ? `${device.speed_kmh.toFixed(1)} km/h` : '—'}
             </span>
 
+            <span className="sr-only">, {statusLabel}</span>
             <span
                 aria-hidden
                 className={cn(

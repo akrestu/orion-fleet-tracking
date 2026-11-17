@@ -569,7 +569,7 @@ export default function DevicesIndex({ devices, groups }: PageProps) {
                             className="h-11 pl-9 md:h-10"
                         />
                     </label>
-                    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+                    <div className="-mx-4 flex [scrollbar-width:none] gap-2 overflow-x-auto px-4 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
                         <FilterPill
                             label="Category"
                             value={filters.category}

@@ -9,6 +9,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -36,4 +38,24 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->wantsJson(),
         );
+
+        // ORION error page for browser (Inertia) requests when debug output is off.
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
+            $status = $response->getStatusCode();
+
+            if (config('app.debug') || $request->is('api/*') || $request->wantsJson()
+                || ! in_array($status, [403, 404, 419, 429, 500, 503], true)) {
+                return $response;
+            }
+
+            if ($status === 419) {
+                return back()->with('status', 'Your session expired. Please try again.');
+            }
+
+            return Inertia::render('error', [
+                'status' => $status,
+                // Short reference so support can find the matching log line.
+                'reference' => substr(hash('sha256', $e::class.$e->getMessage().microtime()), 0, 7),
+            ])->toResponse($request)->setStatusCode($status);
+        });
     })->create();
