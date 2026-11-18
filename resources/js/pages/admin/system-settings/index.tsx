@@ -292,11 +292,8 @@ function MqttPanel({
                     {meta.saved
                         ? 'Managed in ORION — these values override .env.'
                         : 'Showing values from .env. Save once to manage them here.'}{' '}
-                    Restart{' '}
-                    <code className="font-mono">
-                        php artisan mqtt:subscribe
-                    </code>{' '}
-                    after saving for changes to take effect.
+                    The running subscriber picks up saved changes automatically
+                    within a few seconds — no restart needed.
                 </p>
             </header>
 

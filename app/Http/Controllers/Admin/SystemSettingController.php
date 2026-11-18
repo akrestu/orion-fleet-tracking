@@ -91,6 +91,7 @@ class SystemSettingController extends Controller
         }
 
         SystemSetting::setMany($toSave);
+        MqttSettings::markChanged();
 
         AuditLogger::log('settings_updated', 'MQTT configuration updated', null, [], $request);
 

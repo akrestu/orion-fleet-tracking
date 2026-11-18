@@ -201,3 +201,29 @@ it('keeps the saved password when left blank and removes it on request', functio
     app(MqttSettings::class)->apply();
     expect(config('mqtt-client.connections.default.connection_settings.auth.password'))->toBeNull();
 });
+
+it('saving MQTT settings signals the running subscriber to reload', function () {
+    $settings = app(MqttSettings::class);
+    $before = $settings->version();
+
+    expect($settings->hasChangedSince($before))->toBeFalse();
+
+    $this->actingAs($this->admin)
+        ->put('/admin/system-settings', [...validMqttPayload(), 'mqtt_host' => 'new-broker.example.test'])
+        ->assertSessionHasNoErrors();
+
+    expect($settings->hasChangedSince($before))->toBeTrue()
+        ->and($settings->hasChangedSince($settings->version()))->toBeFalse()
+        ->and($settings->apply()['host'])->toBe('new-broker.example.test');
+});
+
+it('a failed validation does not signal a reload', function () {
+    $settings = app(MqttSettings::class);
+    $before = $settings->version();
+
+    $this->actingAs($this->admin)
+        ->put('/admin/system-settings', [...validMqttPayload(), 'mqtt_port' => 0])
+        ->assertSessionHasErrors('mqtt_port');
+
+    expect($settings->hasChangedSince($before))->toBeFalse();
+});

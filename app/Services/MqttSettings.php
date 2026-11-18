@@ -4,18 +4,23 @@ namespace App\Services;
 
 use App\Models\SystemSetting;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 
 /**
  * Every MQTT / ChirpStack connection setting, editable in Admin › System Settings › MQTT.
  *
  * Each value saved in `system_settings` overrides the matching `.env` value; anything
- * not saved yet falls back to `.env` (via config). The subscriber reads them at start-up,
- * so `php artisan mqtt:subscribe` must be restarted after a change.
+ * not saved yet falls back to `.env` (via config). A running `mqtt:subscribe` notices a
+ * save within a few seconds and reconnects with the new values (see markChanged()).
  */
 class MqttSettings
 {
     private const CONNECTION = 'mqtt-client.connections.default';
+
+    /** Cache key holding a token that changes on every save; the subscriber polls it. */
+    public const VERSION_CACHE_KEY = 'mqtt-settings.version';
 
     /**
      * Setting key → [config path, type]. Paths are relative to the default connection,
@@ -52,6 +57,26 @@ class MqttSettings
     public static function isBoolean(string $key): bool
     {
         return (self::FIELDS[$key][1] ?? null) === 'bool';
+    }
+
+    /** Signals running subscribers that the connection settings changed. */
+    public static function markChanged(): void
+    {
+        Cache::forever(self::VERSION_CACHE_KEY, (string) Str::uuid());
+    }
+
+    /** Current change token (null until settings are saved for the first time). */
+    public function version(): ?string
+    {
+        $version = Cache::get(self::VERSION_CACHE_KEY);
+
+        return is_string($version) ? $version : null;
+    }
+
+    /** Whether settings were saved after the given token was read. */
+    public function hasChangedSince(?string $version): bool
+    {
+        return $this->version() !== $version;
     }
 
     /** Encrypts a broker password for storage in `system_settings`. */
