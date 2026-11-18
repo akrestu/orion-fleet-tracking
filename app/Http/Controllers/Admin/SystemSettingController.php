@@ -16,13 +16,9 @@ use Inertia\Response;
 
 class SystemSettingController extends Controller
 {
-    private const MQTT_KEYS = ['mqtt_host', 'mqtt_port', 'mqtt_username', 'mqtt_password', 'mqtt_topic_prefix', 'mqtt_use_tls'];
-
-    public function index(): Response
+    public function index(MqttSettings $mqtt): Response
     {
-        $settings = SystemSetting::whereIn('key', self::MQTT_KEYS)
-            ->pluck('value', 'key')
-            ->toArray();
+        $mqttState = $mqtt->values();
 
         $tokens = ApiToken::with('creator:id,name')
             ->orderByDesc('created_at')
@@ -34,13 +30,13 @@ class SystemSettingController extends Controller
 
         return Inertia::render('admin/system-settings/index', [
             'mqttSettings' => [
-                'mqtt_host' => $settings['mqtt_host'] ?? '',
-                'mqtt_port' => $settings['mqtt_port'] ?? '1883',
-                'mqtt_username' => $settings['mqtt_username'] ?? '',
+                ...$mqttState['values'],
                 'mqtt_password' => '',
-                'mqtt_password_is_set' => ! empty($settings['mqtt_password']),
-                'mqtt_topic_prefix' => $settings['mqtt_topic_prefix'] ?? '',
-                'mqtt_use_tls' => ($settings['mqtt_use_tls'] ?? 'false') === 'true',
+                'mqtt_password_is_set' => $mqttState['password_is_set'],
+            ],
+            'mqttMeta' => [
+                'saved' => $mqttState['saved'],
+                'default_topic' => $mqttState['default_topic'],
             ],
             'apiTokens' => $tokens->map(fn (ApiToken $t) => [
                 'id' => $t->id,
@@ -74,18 +70,24 @@ class SystemSettingController extends Controller
     {
         $validated = $request->validated();
 
-        $toSave = [
-            'mqtt_host' => $validated['mqtt_host'],
-            'mqtt_port' => (string) $validated['mqtt_port'],
-            'mqtt_username' => $validated['mqtt_username'] ?? '',
-            'mqtt_topic_prefix' => $validated['mqtt_topic_prefix'] ?? '',
-            'mqtt_use_tls' => $validated['mqtt_use_tls'] ? 'true' : 'false',
-        ];
+        $toSave = [];
 
-        // Only overwrite the stored password if a new one was explicitly submitted.
+        foreach (MqttSettings::fields() as $key) {
+            if ($key === 'mqtt_password') {
+                continue;
+            }
+
+            $value = $validated[$key] ?? null;
+            $toSave[$key] = MqttSettings::isBoolean($key)
+                ? ($value ? 'true' : 'false')
+                : trim((string) $value);
+        }
+
+        // The password is only replaced when a new one is typed, or cleared on request.
         if (! empty($validated['mqtt_password'])) {
-            // Stored encrypted; the subscriber decrypts it (App\Services\MqttSettings).
             $toSave['mqtt_password'] = MqttSettings::encryptPassword($validated['mqtt_password']);
+        } elseif ($request->boolean('mqtt_password_clear')) {
+            $toSave['mqtt_password'] = '';
         }
 
         SystemSetting::setMany($toSave);

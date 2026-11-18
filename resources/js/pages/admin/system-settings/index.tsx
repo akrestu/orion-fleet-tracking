@@ -25,11 +25,27 @@ import { index as systemSettingsIndex } from '@/routes/admin/system-settings';
 
 type MqttSettings = {
     mqtt_host: string;
-    mqtt_port: string;
+    mqtt_port: number;
+    mqtt_client_id: string;
     mqtt_username: string;
     mqtt_password: string;
-    mqtt_topic_prefix: string;
+    mqtt_password_is_set: boolean;
+    mqtt_clean_session: boolean;
+    mqtt_auto_reconnect: boolean;
+    mqtt_reconnect_max_attempts: number;
+    mqtt_reconnect_delay: number;
     mqtt_use_tls: boolean;
+    mqtt_tls_verify_peer: boolean;
+    mqtt_tls_verify_peer_name: boolean;
+    mqtt_tls_allow_self_signed: boolean;
+    chirpstack_app_id: string;
+    mqtt_topic_prefix: string;
+};
+
+type MqttMeta = {
+    /** True once settings were saved in ORION; false = values shown come from .env. */
+    saved: boolean;
+    default_topic: string;
 };
 
 type ApiToken = {
@@ -67,6 +83,7 @@ type DeviceGroupOption = {
 
 type PageProps = {
     mqttSettings: MqttSettings;
+    mqttMeta: MqttMeta;
     apiTokens: ApiToken[];
     deviceGroups: DeviceGroupOption[];
     auditLogs: AuditLogs;
@@ -138,29 +155,120 @@ function Field({
 
 // ── MQTT Panel ────────────────────────────────────────────────────────────────
 
-function MqttPanel({ settings }: { settings: MqttSettings }) {
-    const { data, setData, put, processing, errors } = useForm({
+function FormSection({
+    title,
+    description,
+    children,
+}: {
+    title: string;
+    description?: string;
+    children: ReactNode;
+}) {
+    return (
+        <fieldset className="grid gap-5 border-t px-6 py-5 sm:grid-cols-2">
+            <legend className="sr-only">{title}</legend>
+            <div className="sm:col-span-2">
+                <h3 className="font-semibold">{title}</h3>
+                {description && (
+                    <p className="text-sm text-muted-foreground">
+                        {description}
+                    </p>
+                )}
+            </div>
+            {children}
+        </fieldset>
+    );
+}
+
+function SwitchRow({
+    id,
+    label,
+    hint,
+    checked,
+    disabled,
+    onChange,
+}: {
+    id: string;
+    label: string;
+    hint?: string;
+    checked: boolean;
+    disabled?: boolean;
+    onChange: (value: boolean) => void;
+}) {
+    return (
+        <div className="flex min-h-11 items-start gap-3">
+            <Switch
+                id={id}
+                checked={checked}
+                disabled={disabled}
+                onCheckedChange={onChange}
+                className="mt-0.5"
+                aria-describedby={hint ? `${id}-hint` : undefined}
+            />
+            <div>
+                <Label htmlFor={id}>{label}</Label>
+                {hint && (
+                    <p
+                        id={`${id}-hint`}
+                        className="text-xs text-muted-foreground"
+                    >
+                        {hint}
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function MqttPanel({
+    settings,
+    meta,
+}: {
+    settings: MqttSettings;
+    meta: MqttMeta;
+}) {
+    const { data, setData, put, processing, errors, isDirty } = useForm({
         mqtt_host: settings.mqtt_host,
         mqtt_port: settings.mqtt_port,
+        mqtt_client_id: settings.mqtt_client_id,
         mqtt_username: settings.mqtt_username,
-        mqtt_password: settings.mqtt_password,
-        mqtt_topic_prefix: settings.mqtt_topic_prefix,
+        mqtt_password: '',
+        mqtt_password_clear: false,
+        mqtt_clean_session: settings.mqtt_clean_session,
+        mqtt_auto_reconnect: settings.mqtt_auto_reconnect,
+        mqtt_reconnect_max_attempts: settings.mqtt_reconnect_max_attempts,
+        mqtt_reconnect_delay: settings.mqtt_reconnect_delay,
         mqtt_use_tls: settings.mqtt_use_tls,
+        mqtt_tls_verify_peer: settings.mqtt_tls_verify_peer,
+        mqtt_tls_verify_peer_name: settings.mqtt_tls_verify_peer_name,
+        mqtt_tls_allow_self_signed: settings.mqtt_tls_allow_self_signed,
+        chirpstack_app_id: settings.chirpstack_app_id,
+        mqtt_topic_prefix: settings.mqtt_topic_prefix,
     });
     const configured = settings.mqtt_host !== '';
+    const topicPreview =
+        data.mqtt_topic_prefix.trim() ||
+        `application/${data.chirpstack_app_id.trim() || '{CHIRPSTACK_APP_ID}'}/device/+/event/up`;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(adminSystemSettings.update.url(), { preserveScroll: true });
+        put(adminSystemSettings.update.url(), {
+            preserveScroll: true,
+            onSuccess: () => setData('mqtt_password', ''),
+        });
     };
 
     return (
         <section className="max-w-3xl rounded-xl border bg-card">
-            <header className="flex items-start justify-between gap-4 border-b px-6 py-5">
+            <header className="flex flex-wrap items-start justify-between gap-4 px-6 py-5">
                 <div>
                     <h2 className="text-lg font-semibold">MQTT broker</h2>
                     <p className="text-sm text-muted-foreground">
-                        Where ORION subscribes to ChirpStack uplinks.
+                        Connection used by{' '}
+                        <code className="font-mono text-xs">
+                            mqtt:subscribe
+                        </code>{' '}
+                        to receive ChirpStack uplinks.
                     </p>
                 </div>
                 <span
@@ -180,10 +288,20 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
                     />
                     {configured ? 'Configured' : 'Not configured'}
                 </span>
+                <p className="w-full rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+                    {meta.saved
+                        ? 'Managed in ORION — these values override .env.'
+                        : 'Showing values from .env. Save once to manage them here.'}{' '}
+                    Restart{' '}
+                    <code className="font-mono">
+                        php artisan mqtt:subscribe
+                    </code>{' '}
+                    after saving for changes to take effect.
+                </p>
             </header>
 
             <form onSubmit={handleSubmit}>
-                <div className="grid gap-5 px-6 py-5 sm:grid-cols-2">
+                <FormSection title="Broker">
                     <div className="grid gap-5 sm:col-span-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
                         <Field
                             id="mqtt_host"
@@ -213,13 +331,75 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
                                 max={65535}
                                 value={data.mqtt_port}
                                 onChange={(e) =>
-                                    setData('mqtt_port', e.target.value)
+                                    setData('mqtt_port', Number(e.target.value))
                                 }
-                                placeholder="1883"
                                 className="font-mono"
                             />
                         </Field>
                     </div>
+                    <Field
+                        id="mqtt_client_id"
+                        label="Client ID"
+                        error={errors.mqtt_client_id}
+                    >
+                        <Input
+                            id="mqtt_client_id"
+                            value={data.mqtt_client_id}
+                            onChange={(e) =>
+                                setData('mqtt_client_id', e.target.value)
+                            }
+                            placeholder="orion-subscriber"
+                            autoComplete="off"
+                            className="font-mono"
+                        />
+                    </Field>
+                    <Field
+                        id="chirpstack_app_id"
+                        label="ChirpStack application ID"
+                        error={errors.chirpstack_app_id}
+                    >
+                        <Input
+                            id="chirpstack_app_id"
+                            value={data.chirpstack_app_id}
+                            onChange={(e) =>
+                                setData('chirpstack_app_id', e.target.value)
+                            }
+                            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                            autoComplete="off"
+                            className="font-mono"
+                        />
+                    </Field>
+                    <Field
+                        id="mqtt_topic_prefix"
+                        label="Topic override"
+                        optional
+                        error={errors.mqtt_topic_prefix}
+                        className="sm:col-span-2"
+                    >
+                        <Input
+                            id="mqtt_topic_prefix"
+                            value={data.mqtt_topic_prefix}
+                            onChange={(e) =>
+                                setData('mqtt_topic_prefix', e.target.value)
+                            }
+                            placeholder={meta.default_topic}
+                            autoComplete="off"
+                            className="font-mono"
+                            aria-describedby="topic-preview"
+                        />
+                        <p
+                            id="topic-preview"
+                            className="text-xs text-muted-foreground"
+                        >
+                            Subscribes to{' '}
+                            <code className="font-mono break-all">
+                                {topicPreview}
+                            </code>
+                        </p>
+                    </Field>
+                </FormSection>
+
+                <FormSection title="Authentication">
                     <Field
                         id="mqtt_username"
                         label="Username"
@@ -245,42 +425,139 @@ function MqttPanel({ settings }: { settings: MqttSettings }) {
                             id="mqtt_password"
                             type="password"
                             value={data.mqtt_password}
-                            onChange={(e) =>
-                                setData('mqtt_password', e.target.value)
-                            }
+                            onChange={(e) => {
+                                setData('mqtt_password', e.target.value);
+                                setData('mqtt_password_clear', false);
+                            }}
                             autoComplete="new-password"
-                            placeholder="Leave blank to keep"
+                            placeholder={
+                                settings.mqtt_password_is_set
+                                    ? '•••••••• (leave blank to keep)'
+                                    : 'Not set'
+                            }
                         />
+                        {settings.mqtt_password_is_set && (
+                            <label className="flex min-h-9 items-center gap-2 text-xs text-muted-foreground">
+                                <Checkbox
+                                    checked={data.mqtt_password_clear}
+                                    onCheckedChange={(v) => {
+                                        setData(
+                                            'mqtt_password_clear',
+                                            v === true,
+                                        );
+                                        setData('mqtt_password', '');
+                                    }}
+                                />
+                                Remove the saved password
+                            </label>
+                        )}
                     </Field>
+                </FormSection>
+
+                <FormSection
+                    title="Connection"
+                    description="Session and reconnect behaviour of the subscriber."
+                >
+                    <SwitchRow
+                        id="mqtt_clean_session"
+                        label="Clean session"
+                        hint="Off keeps queued QoS 1 uplinks while ORION is offline."
+                        checked={data.mqtt_clean_session}
+                        onChange={(v) => setData('mqtt_clean_session', v)}
+                    />
+                    <SwitchRow
+                        id="mqtt_auto_reconnect"
+                        label="Auto reconnect"
+                        hint="Reconnect automatically when the broker drops."
+                        checked={data.mqtt_auto_reconnect}
+                        onChange={(v) => setData('mqtt_auto_reconnect', v)}
+                    />
                     <Field
-                        id="mqtt_topic_prefix"
-                        label="Topic"
-                        optional
-                        error={errors.mqtt_topic_prefix}
-                        className="sm:col-span-2"
+                        id="mqtt_reconnect_max_attempts"
+                        label="Max reconnect attempts"
+                        error={errors.mqtt_reconnect_max_attempts}
                     >
                         <Input
-                            id="mqtt_topic_prefix"
-                            value={data.mqtt_topic_prefix}
+                            id="mqtt_reconnect_max_attempts"
+                            type="number"
+                            min={0}
+                            value={data.mqtt_reconnect_max_attempts}
+                            disabled={!data.mqtt_auto_reconnect}
                             onChange={(e) =>
-                                setData('mqtt_topic_prefix', e.target.value)
+                                setData(
+                                    'mqtt_reconnect_max_attempts',
+                                    Number(e.target.value),
+                                )
                             }
-                            placeholder="application/+/device/+/event/up"
-                            autoComplete="off"
                             className="font-mono"
                         />
                     </Field>
-                    <label className="flex min-h-11 items-center gap-3 text-sm sm:col-span-2">
-                        <Switch
-                            id="mqtt_use_tls"
-                            checked={data.mqtt_use_tls}
-                            onCheckedChange={(v) => setData('mqtt_use_tls', v)}
+                    <Field
+                        id="mqtt_reconnect_delay"
+                        label="Delay between attempts (seconds)"
+                        error={errors.mqtt_reconnect_delay}
+                    >
+                        <Input
+                            id="mqtt_reconnect_delay"
+                            type="number"
+                            min={1}
+                            value={data.mqtt_reconnect_delay}
+                            disabled={!data.mqtt_auto_reconnect}
+                            onChange={(e) =>
+                                setData(
+                                    'mqtt_reconnect_delay',
+                                    Number(e.target.value),
+                                )
+                            }
+                            className="font-mono"
                         />
-                        Use TLS / SSL
-                    </label>
-                </div>
+                    </Field>
+                </FormSection>
 
-                <div className="flex justify-end border-t px-6 py-4">
+                <FormSection
+                    title="TLS"
+                    description="Required when the broker is reached over the internet (usually port 8883)."
+                >
+                    <SwitchRow
+                        id="mqtt_use_tls"
+                        label="Use TLS / SSL"
+                        checked={data.mqtt_use_tls}
+                        onChange={(v) => setData('mqtt_use_tls', v)}
+                    />
+                    <SwitchRow
+                        id="mqtt_tls_verify_peer"
+                        label="Verify certificate"
+                        checked={data.mqtt_tls_verify_peer}
+                        disabled={!data.mqtt_use_tls}
+                        onChange={(v) => setData('mqtt_tls_verify_peer', v)}
+                    />
+                    <SwitchRow
+                        id="mqtt_tls_verify_peer_name"
+                        label="Verify host name"
+                        checked={data.mqtt_tls_verify_peer_name}
+                        disabled={!data.mqtt_use_tls}
+                        onChange={(v) =>
+                            setData('mqtt_tls_verify_peer_name', v)
+                        }
+                    />
+                    <SwitchRow
+                        id="mqtt_tls_allow_self_signed"
+                        label="Allow self-signed certificate"
+                        hint="Only for brokers with their own CA."
+                        checked={data.mqtt_tls_allow_self_signed}
+                        disabled={!data.mqtt_use_tls}
+                        onChange={(v) =>
+                            setData('mqtt_tls_allow_self_signed', v)
+                        }
+                    />
+                </FormSection>
+
+                <div className="flex items-center justify-end gap-3 border-t px-6 py-4">
+                    {isDirty && (
+                        <span className="text-xs text-muted-foreground">
+                            Unsaved changes
+                        </span>
+                    )}
                     <Button type="submit" disabled={processing}>
                         Save
                     </Button>
@@ -750,6 +1027,7 @@ function AuditLogPanel({ logs }: { logs: AuditLogs }) {
 
 export default function SystemSettingsIndex({
     mqttSettings,
+    mqttMeta,
     apiTokens,
     deviceGroups,
     auditLogs,
@@ -776,7 +1054,7 @@ export default function SystemSettingsIndex({
                     </TabsList>
 
                     <TabsContent value="mqtt" className="mt-5">
-                        <MqttPanel settings={mqttSettings} />
+                        <MqttPanel settings={mqttSettings} meta={mqttMeta} />
                     </TabsContent>
 
                     <TabsContent value="api-keys" className="mt-5">

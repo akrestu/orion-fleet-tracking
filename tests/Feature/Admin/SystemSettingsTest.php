@@ -5,6 +5,7 @@ use App\Models\Device;
 use App\Models\DeviceGroup;
 use App\Models\SystemSetting;
 use App\Models\User;
+use App\Services\MqttSettings;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -32,6 +33,7 @@ it('denies operator access to system settings', function () {
 it('admin can update MQTT settings', function () {
     $this->actingAs($this->admin)
         ->put('/admin/system-settings', [
+            ...validMqttPayload(),
             'mqtt_host' => 'mqtt.example.com',
             'mqtt_port' => 8883,
             'mqtt_username' => 'fleet',
@@ -110,4 +112,92 @@ it('redirects the api-tokens index to system settings', function () {
     $this->actingAs($this->admin)
         ->get('/admin/api-tokens')
         ->assertRedirect(route('admin.system-settings.index'));
+});
+
+/**
+ * @return array<string, mixed>
+ */
+function validMqttPayload(): array
+{
+    return [
+        'mqtt_host' => 'broker.example.test',
+        'mqtt_port' => 1883,
+        'mqtt_client_id' => 'orion-subscriber',
+        'mqtt_username' => 'orion',
+        'mqtt_password' => '',
+        'mqtt_clean_session' => false,
+        'mqtt_auto_reconnect' => true,
+        'mqtt_reconnect_max_attempts' => 999999,
+        'mqtt_reconnect_delay' => 5,
+        'mqtt_use_tls' => false,
+        'mqtt_tls_verify_peer' => true,
+        'mqtt_tls_verify_peer_name' => true,
+        'mqtt_tls_allow_self_signed' => false,
+        'chirpstack_app_id' => '1f2e3d4c-0000-4000-8000-abcdefabcdef',
+        'mqtt_topic_prefix' => '',
+    ];
+}
+
+it('shows the .env MQTT configuration until settings are saved, without leaking the password', function () {
+    config([
+        'mqtt-client.connections.default.host' => 'env-broker.local',
+        'mqtt-client.connections.default.client_id' => 'env-client',
+        'mqtt-client.connections.default.connection_settings.auth.password' => 'env-secret',
+        'mqtt-client.connections.default.connection_settings.tls.verify_peer' => true,
+        'app.chirpstack_app_id' => 'env-app',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get('/admin/system-settings')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('mqttSettings.mqtt_host', 'env-broker.local')
+            ->where('mqttSettings.mqtt_client_id', 'env-client')
+            ->where('mqttSettings.chirpstack_app_id', 'env-app')
+            ->where('mqttSettings.mqtt_tls_verify_peer', true)
+            ->where('mqttSettings.mqtt_password', '')
+            ->where('mqttSettings.mqtt_password_is_set', true)
+            ->where('mqttMeta.saved', false)
+            ->where('mqttMeta.default_topic', 'application/env-app/device/+/event/up'));
+});
+
+it('saved MQTT settings override the subscriber config and keep the password encrypted', function () {
+    $this->actingAs($this->admin)
+        ->put('/admin/system-settings', [
+            ...validMqttPayload(),
+            'mqtt_port' => 8883,
+            'mqtt_password' => 's3cret',
+            'mqtt_use_tls' => true,
+            'mqtt_tls_allow_self_signed' => true,
+            'mqtt_reconnect_delay' => 10,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(SystemSetting::getValue('mqtt_password'))->not->toBe('s3cret');
+
+    $applied = app(MqttSettings::class)->apply();
+
+    expect($applied)->toBe([
+        'host' => 'broker.example.test',
+        'port' => 8883,
+        'topic' => 'application/1f2e3d4c-0000-4000-8000-abcdefabcdef/device/+/event/up',
+        'source' => 'settings',
+    ])
+        ->and(config('mqtt-client.connections.default.connection_settings.auth.password'))->toBe('s3cret')
+        ->and(config('mqtt-client.connections.default.connection_settings.tls.enabled'))->toBeTrue()
+        ->and(config('mqtt-client.connections.default.connection_settings.tls.allow_self_signed_certificate'))->toBeTrue()
+        ->and(config('mqtt-client.connections.default.connection_settings.auto_reconnect.delay_between_reconnect_attempts'))->toBe(10)
+        ->and(config('mqtt-client.connections.default.client_id'))->toBe('orion-subscriber');
+});
+
+it('keeps the saved password when left blank and removes it on request', function () {
+    $this->actingAs($this->admin)->put('/admin/system-settings', [...validMqttPayload(), 'mqtt_password' => 'keep-me']);
+    $this->actingAs($this->admin)->put('/admin/system-settings', validMqttPayload());
+
+    app(MqttSettings::class)->apply();
+    expect(config('mqtt-client.connections.default.connection_settings.auth.password'))->toBe('keep-me');
+
+    $this->actingAs($this->admin)->put('/admin/system-settings', [...validMqttPayload(), 'mqtt_password_clear' => true]);
+
+    app(MqttSettings::class)->apply();
+    expect(config('mqtt-client.connections.default.connection_settings.auth.password'))->toBeNull();
 });
