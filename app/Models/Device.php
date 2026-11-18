@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\DeviceFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Device extends Model
 {
-    use HasFactory, SoftDeletes;
+    /** @use HasFactory<DeviceFactory> */
+    use HasFactory;
+
+    use SoftDeletes;
 
     protected $fillable = [
         'device_group_id',
@@ -47,6 +51,9 @@ class Device extends Model
         return $this->hasMany(GpsLog::class, 'dev_eui', 'dev_eui');
     }
 
+    /**
+     * @return HasMany<Alert, $this>
+     */
     public function alerts(): HasMany
     {
         return $this->hasMany(Alert::class, 'dev_eui', 'dev_eui');
@@ -62,12 +69,20 @@ class Device extends Model
         return $this->last_seen_at->gt(now()->subMinutes(10)) ? 'online' : 'offline';
     }
 
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
     }
 
     /** Eager-load each device's most recent GPS log without an N+1 query. */
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopeWithLatestGpsLog(Builder $query): Builder
     {
         $latestLogIds = GpsLog::selectRaw('MAX(id) as id')->groupBy('dev_eui');

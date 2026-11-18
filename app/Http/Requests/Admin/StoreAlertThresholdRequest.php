@@ -30,7 +30,9 @@ class StoreAlertThresholdRequest extends FormRequest
             'alert_type' => ['required', Rule::in($validAlertTypes)],
             'dev_eui' => ['nullable', 'string', 'exists:devices,dev_eui'],
             'unit_type' => ['nullable', Rule::in($validUnitTypes)],
-            'threshold_value' => ['required', 'numeric', 'min:0'],
+            'threshold_value' => $this->input('alert_type') === AlertType::LowSignal->value
+                ? ['required', 'numeric', 'between:-150,0']
+                : ['required', 'numeric', 'min:0'],
             'is_active' => ['boolean'],
         ];
     }

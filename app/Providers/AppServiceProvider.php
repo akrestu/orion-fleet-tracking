@@ -37,13 +37,11 @@ class AppServiceProvider extends ServiceProvider
     protected function registerAuditListeners(): void
     {
         Event::listen(Login::class, function (Login $event): void {
-            AuditLogger::log('login', 'User logged in', $event->user->id);
+            AuditLogger::log('login', 'User logged in', $event->user->getAuthIdentifier());
         });
 
         Event::listen(Logout::class, function (Logout $event): void {
-            if ($event->user) {
-                AuditLogger::log('logout', 'User logged out', $event->user->id);
-            }
+            AuditLogger::log('logout', 'User logged out', $event->user->getAuthIdentifier());
         });
     }
 

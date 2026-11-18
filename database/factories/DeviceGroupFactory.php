@@ -17,10 +17,11 @@ class DeviceGroupFactory extends Factory
      */
     public function definition(): array
     {
-        $colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316'];
+        // ORION group swatches (see resources/js/components/orion/map-marker.ts).
+        $colors = ['#0f8a96', '#7a3fe0', '#119ccb', '#cc2f9c', '#2d50d8', '#7d8187'];
 
         return [
-            'name' => fake()->words(2, true).' Site',
+            'name' => ucfirst(fake()->word()).' '.ucfirst(fake()->word()).' Site',
             'location' => fake()->city().', '.fake()->country(),
             'description' => fake()->optional()->sentence(),
             'color' => fake()->randomElement($colors),

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\GpsLogFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\MassPrunable;
@@ -10,7 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class GpsLog extends Model
 {
-    use HasFactory, MassPrunable;
+    /** @use HasFactory<GpsLogFactory> */
+    use HasFactory;
+
+    use MassPrunable;
 
     public $timestamps = false;
 
@@ -61,16 +65,27 @@ class GpsLog extends Model
         'created_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<Device, $this>
+     */
     public function device(): BelongsTo
     {
         return $this->belongsTo(Device::class, 'dev_eui', 'dev_eui');
     }
 
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopeRecent(Builder $query, int $minutes = 60): Builder
     {
         return $query->where('recorded_at', '>=', now()->subMinutes($minutes));
     }
 
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopeForDevice(Builder $query, string $devEui): Builder
     {
         return $query->where('dev_eui', $devEui);

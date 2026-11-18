@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\GpsIngestionService;
 use App\Services\MqttPayloadParser;
+use App\Services\MqttSettings;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use PhpMqtt\Client\Contracts\MqttClient;
@@ -20,6 +21,7 @@ class MqttSubscribeCommand extends Command
     public function __construct(
         private readonly MqttPayloadParser $parser,
         private readonly GpsIngestionService $ingestionService,
+        private readonly MqttSettings $settings,
     ) {
         parent::__construct();
     }
@@ -31,13 +33,11 @@ class MqttSubscribeCommand extends Command
 
     public function handle(): int
     {
-        $appId = config('app.chirpstack_app_id');
-        $topic = "application/{$appId}/device/+/event/up";
-        $host = config('mqtt-client.connections.default.host');
-        $port = config('mqtt-client.connections.default.port');
+        // System Settings (if a host was saved there) override .env.
+        ['host' => $host, 'port' => $port, 'topic' => $topic, 'source' => $source] = $this->settings->apply();
 
         $this->info('ORION MQTT Subscriber');
-        $this->info("Broker : {$host}:{$port}");
+        $this->info("Broker : {$host}:{$port} (from {$source})");
         $this->info("Topic  : {$topic}");
         $this->info('─────────────────────────────────────────');
         $this->info('Listening for GPS uplinks... (Ctrl+C to stop)');

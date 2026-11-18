@@ -8,6 +8,7 @@ use App\Models\ApiToken;
 use App\Models\AuditLog;
 use App\Models\DeviceGroup;
 use App\Models\SystemSetting;
+use App\Services\MqttSettings;
 use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -83,7 +84,8 @@ class SystemSettingController extends Controller
 
         // Only overwrite the stored password if a new one was explicitly submitted.
         if (! empty($validated['mqtt_password'])) {
-            $toSave['mqtt_password'] = $validated['mqtt_password'];
+            // Stored encrypted; the subscriber decrypts it (App\Services\MqttSettings).
+            $toSave['mqtt_password'] = MqttSettings::encryptPassword($validated['mqtt_password']);
         }
 
         SystemSetting::setMany($toSave);

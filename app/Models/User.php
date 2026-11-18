@@ -74,6 +74,9 @@ class User extends Authenticatable implements PasskeyUser
         return $this->role->canOperate();
     }
 
+    /**
+     * @return BelongsToMany<DeviceGroup, $this>
+     */
     public function deviceGroups(): BelongsToMany
     {
         return $this->belongsToMany(DeviceGroup::class);

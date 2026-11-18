@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\StoreAlertThresholdRequest;
 use App\Http\Requests\Admin\UpdateAlertThresholdRequest;
 use App\Models\AlertThreshold;
 use App\Models\Device;
+use App\Services\AlertEvaluator;
 use App\Support\UnitTypes;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -78,6 +79,8 @@ class AlertThresholdController extends Controller
             'is_active' => $request->boolean('is_active', true),
         ]);
 
+        AlertEvaluator::flushRules();
+
         return back()->with('success', 'Threshold created.');
     }
 
@@ -88,12 +91,16 @@ class AlertThresholdController extends Controller
             'is_active' => $request->boolean('is_active'),
         ]);
 
+        AlertEvaluator::flushRules();
+
         return back()->with('success', 'Threshold updated.');
     }
 
     public function destroy(AlertThreshold $alertThreshold): RedirectResponse
     {
         $alertThreshold->delete();
+
+        AlertEvaluator::flushRules();
 
         return back()->with('success', 'Threshold deleted.');
     }

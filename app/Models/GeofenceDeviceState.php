@@ -21,6 +21,9 @@ class GeofenceDeviceState extends Model
         'checked_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<Geofence, $this>
+     */
     public function geofence(): BelongsTo
     {
         return $this->belongsTo(Geofence::class);

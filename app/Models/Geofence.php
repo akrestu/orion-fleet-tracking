@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use Database\Factories\GeofenceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Geofence extends Model
 {
+    /** @use HasFactory<GeofenceFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -24,6 +26,9 @@ class Geofence extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * @return HasMany<GeofenceDeviceState, $this>
+     */
     public function deviceStates(): HasMany
     {
         return $this->hasMany(GeofenceDeviceState::class);

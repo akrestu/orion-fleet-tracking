@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AlertType;
+use Database\Factories\AlertFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Alert extends Model
 {
+    /** @use HasFactory<AlertFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -35,6 +37,10 @@ class Alert extends Model
         return $this->belongsTo(Device::class, 'dev_eui', 'dev_eui');
     }
 
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
     public function scopeUnresolved(Builder $query): Builder
     {
         return $query->whereNull('resolved_at');

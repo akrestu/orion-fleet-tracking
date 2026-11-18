@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Enums\AlertType;
+use Database\Factories\AlertThresholdFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AlertThreshold extends Model
 {
+    /** @use HasFactory<AlertThresholdFactory> */
     use HasFactory;
 
     protected $fillable = [

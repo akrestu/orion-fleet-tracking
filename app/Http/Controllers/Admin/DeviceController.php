@@ -7,10 +7,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\CreateDeviceRequest;
 use App\Http\Requests\Admin\UpdateDeviceRequest;
 use App\Models\Alert;
-use App\Models\AlertThreshold;
 use App\Models\Device;
 use App\Models\DeviceGroup;
 use App\Models\GpsLog;
+use App\Services\AlertEvaluator;
 use App\Services\DashboardService;
 use App\Services\FleetUtilizationService;
 use App\Services\ReportService;
@@ -130,21 +130,10 @@ class DeviceController extends Controller
         ];
     }
 
-    /** Effective overspeed limit (km/h): device rule › unit-type rule › global rule. */
+    /** Effective overspeed limit (km/h): device › unit type › global (shared with the alert evaluator). */
     private function overspeedThreshold(Device $device): ?float
     {
-        $rules = AlertThreshold::where('alert_type', AlertType::Overspeed)
-            ->where('is_active', true)
-            ->where(fn ($q) => $q->where('dev_eui', $device->dev_eui)
-                ->orWhere(fn ($q) => $q->whereNull('dev_eui')->where('unit_type', $device->unit_type))
-                ->orWhere(fn ($q) => $q->whereNull('dev_eui')->whereNull('unit_type')))
-            ->get();
-
-        $rule = $rules->firstWhere('dev_eui', $device->dev_eui)
-            ?? $rules->first(fn (AlertThreshold $r) => $r->dev_eui === null && $r->unit_type !== null)
-            ?? $rules->first(fn (AlertThreshold $r) => $r->dev_eui === null && $r->unit_type === null);
-
-        return $rule?->threshold_value;
+        return app(AlertEvaluator::class)->thresholdFor($device, AlertType::Overspeed);
     }
 
     public function store(CreateDeviceRequest $request): RedirectResponse

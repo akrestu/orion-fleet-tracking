@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Log;
 
 class GpsIngestionService
 {
+    public function __construct(private readonly AlertEvaluator $alerts) {}
+
     /**
      * Simpan data GPS dari payload yang sudah diparsing.
      *
@@ -59,6 +61,15 @@ class GpsIngestionService
 
         CheckGeofences::dispatch($gpsLog);
 
+        try {
+            $this->alerts->evaluateUplink($gpsLog, $device);
+        } catch (\Throwable $e) {
+            Log::error('[Alerts] Threshold evaluation failed', [
+                'dev_eui' => $gpsLog->dev_eui,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         Log::info(sprintf(
             '[MQTT] Ingested: %s [%s] @ %.6f,%.6f %.1fkm/h',
             $parsedData['device_name'],
@@ -73,6 +84,8 @@ class GpsIngestionService
 
     /**
      * Buat atau update device di tabel devices berdasarkan data payload.
+     *
+     * @param  array<string, mixed>  $parsedData
      */
     private function upsertDevice(array $parsedData): Device
     {

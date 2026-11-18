@@ -17,7 +17,7 @@ class FleetUtilizationService
      * its GPS logs (no full in-memory load).
      *
      * @return array{log_count: int, operation_hours: float, running_hours: float, idle_hours: float, distance_km: float, avg_speed_kmh: float, max_speed_kmh: float}|null
-     *         Null when the device has no logs in range.
+     *                                                                                                                                                                     Null when the device has no logs in range.
      */
     public function computeForDevice(string $devEui, CarbonInterface $from, CarbonInterface $to): ?array
     {
