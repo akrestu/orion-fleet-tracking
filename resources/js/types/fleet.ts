@@ -22,6 +22,13 @@ export interface GpsLogPoint {
     recorded_at: string;
 }
 
+/** Loading/dumping zone a hauler is currently inside; `entered_at` = first fix inside. */
+export interface DwellZone {
+    type: 'loading' | 'dumping';
+    name: string;
+    entered_at: string;
+}
+
 export interface DevicePosition {
     /** Device primary key (Fleet Map initial load only; used for the admin Details link). */
     id?: number;
@@ -41,5 +48,7 @@ export interface DevicePosition {
     gateway_id?: string | null;
     /** True while the unit has an unresolved alert (initial page load only; kept across live updates). */
     has_alert?: boolean;
+    /** Current loading/dumping dwell (haulers only); live-updated via `device.zone.changed`. */
+    zone?: DwellZone | null;
     recorded_at: string | null;
 }

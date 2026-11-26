@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\Geofence;
 use App\Models\GpsLog;
 use App\Support\GeoHelper;
+use App\Support\UnitTypes;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
@@ -141,7 +142,9 @@ class ReportService
             return ['trips' => [], 'summary' => [], 'warning' => 'No loading/dumping/parking zones configured.'];
         }
 
+        // Cycles only make sense for haulers — loaders/excavators stay inside the loading zone.
         $devices = Device::active()
+            ->whereIn('unit_type', UnitTypes::haulers())
             ->when($devEuiFilter, fn ($q) => $q->where('dev_eui', $devEuiFilter))
             ->orderBy('device_name')
             ->get(['dev_eui', 'device_name', 'unit_type'])
@@ -188,7 +191,9 @@ class ReportService
                 return round($distance, 2);
             };
 
-            // Compress consecutive same-zone segments
+            // Compress consecutive same-zone segments. A segment ends at the first fix
+            // *outside* it ("exit"): a unit parked/loading only sends a 120 s heartbeat,
+            // but uplinks immediately once it starts moving.
             $segments = [];
             foreach ($timeline as $point) {
                 $last = end($segments);
@@ -198,66 +203,51 @@ class ReportService
                     $segments[] = ['zone' => $point['zone'], 'start' => $point['at'], 'end' => $point['at']];
                 }
             }
+            foreach ($segments as $i => $segment) {
+                $segments[$i]['exit'] = $segments[$i + 1]['start'] ?? $segment['end'];
+            }
+
+            $minutesBetween = fn (CarbonInterface $a, CarbonInterface $b): float => round(abs($b->diffInSeconds($a)) / 60, 1);
+            $newTrip = fn (array $seg): array => [
+                'dev_eui' => $devEui,
+                'device_name' => $device?->device_name ?? $devEui,
+                'unit_type' => $device?->unit_type ?? 'other',
+                'load_start' => $seg['start']->toIso8601String(),
+                'load_end' => $seg['exit']->toIso8601String(),
+                'dump_start' => null,
+                'dump_end' => null,
+                'return_start' => null,
+                'load_duration_min' => $minutesBetween($seg['start'], $seg['exit']),
+                'dump_duration_min' => null,
+                'cycle_duration_min' => null,
+                'haul_duration_min' => null,
+                'return_duration_min' => null,
+                'distance_km' => null,
+                'avg_speed_kmh' => null,
+            ];
 
             // Detect cycles: loading → (haul) → dumping → (return) → loading...
             $currentTrip = null;
             foreach ($segments as $seg) {
                 if ($seg['zone'] === 'loading' && $currentTrip !== null && $currentTrip['dump_start'] !== null) {
                     // Back at loading = cycle complete
+                    $loadStart = Carbon::parse($currentTrip['load_start']);
                     $currentTrip['return_start'] = $currentTrip['dump_end'];
-                    $currentTrip['return_duration_min'] = round(
-                        abs($seg['start']->diffInSeconds(Carbon::parse($currentTrip['dump_end']))) / 60,
-                        1,
-                    );
-                    $currentTrip['cycle_duration_min'] = round(
-                        abs($seg['start']->diffInSeconds(Carbon::parse($currentTrip['load_start']))) / 60,
-                        1,
-                    );
-                    $currentTrip['distance_km'] = $tripDistanceKm(Carbon::parse($currentTrip['load_start']), $seg['start']);
+                    $currentTrip['return_duration_min'] = $minutesBetween(Carbon::parse($currentTrip['dump_end']), $seg['start']);
+                    $currentTrip['cycle_duration_min'] = $minutesBetween($loadStart, $seg['start']);
+                    $currentTrip['distance_km'] = $tripDistanceKm($loadStart, $seg['start']);
                     $currentTrip['avg_speed_kmh'] = $currentTrip['cycle_duration_min'] > 0
                         ? round($currentTrip['distance_km'] / ($currentTrip['cycle_duration_min'] / 60), 1)
                         : null;
                     $trips[] = $currentTrip;
-                    // Start fresh trip at this loading zone
-                    $currentTrip = [
-                        'dev_eui' => $devEui,
-                        'device_name' => $device?->device_name ?? $devEui,
-                        'unit_type' => $device?->unit_type ?? 'other',
-                        'load_start' => $seg['start']->toIso8601String(),
-                        'load_end' => $seg['end']->toIso8601String(),
-                        'dump_start' => null,
-                        'dump_end' => null,
-                        'return_start' => null,
-                        'cycle_duration_min' => null,
-                        'haul_duration_min' => null,
-                        'return_duration_min' => null,
-                        'distance_km' => null,
-                        'avg_speed_kmh' => null,
-                    ];
+                    $currentTrip = $newTrip($seg);
                 } elseif ($seg['zone'] === 'loading') {
-                    // Start a new trip
-                    $currentTrip = [
-                        'dev_eui' => $devEui,
-                        'device_name' => $device?->device_name ?? $devEui,
-                        'unit_type' => $device?->unit_type ?? 'other',
-                        'load_start' => $seg['start']->toIso8601String(),
-                        'load_end' => $seg['end']->toIso8601String(),
-                        'dump_start' => null,
-                        'dump_end' => null,
-                        'return_start' => null,
-                        'cycle_duration_min' => null,
-                        'haul_duration_min' => null,
-                        'return_duration_min' => null,
-                        'distance_km' => null,
-                        'avg_speed_kmh' => null,
-                    ];
+                    $currentTrip = $newTrip($seg);
                 } elseif ($seg['zone'] === 'dumping' && $currentTrip !== null && $currentTrip['dump_start'] === null) {
                     $currentTrip['dump_start'] = $seg['start']->toIso8601String();
-                    $currentTrip['dump_end'] = $seg['end']->toIso8601String();
-                    $currentTrip['haul_duration_min'] = round(
-                        abs($seg['start']->diffInSeconds(Carbon::parse($currentTrip['load_end']))) / 60,
-                        1,
-                    );
+                    $currentTrip['dump_end'] = $seg['exit']->toIso8601String();
+                    $currentTrip['dump_duration_min'] = $minutesBetween($seg['start'], $seg['exit']);
+                    $currentTrip['haul_duration_min'] = $minutesBetween(Carbon::parse($currentTrip['load_end']), $seg['start']);
                 }
             }
         }
@@ -273,19 +263,17 @@ class ReportService
                     'unit_type' => $trip['unit_type'],
                     'trip_count' => 0,
                     'avg_cycle_min' => [],
+                    'avg_load_min' => [],
                     'avg_haul_min' => [],
+                    'avg_dump_min' => [],
                     'avg_return_min' => [],
                 ];
             }
             $summaryMap[$key]['trip_count']++;
-            if ($trip['cycle_duration_min'] !== null) {
-                $summaryMap[$key]['avg_cycle_min'][] = $trip['cycle_duration_min'];
-            }
-            if ($trip['haul_duration_min'] !== null) {
-                $summaryMap[$key]['avg_haul_min'][] = $trip['haul_duration_min'];
-            }
-            if ($trip['return_duration_min'] !== null) {
-                $summaryMap[$key]['avg_return_min'][] = $trip['return_duration_min'];
+            foreach (['cycle', 'load', 'haul', 'dump', 'return'] as $phase) {
+                if ($trip["{$phase}_duration_min"] !== null) {
+                    $summaryMap[$key]["avg_{$phase}_min"][] = $trip["{$phase}_duration_min"];
+                }
             }
         }
 
@@ -298,7 +286,9 @@ class ReportService
                 'unit_type' => $s['unit_type'],
                 'trip_count' => $s['trip_count'],
                 'avg_cycle_min' => $avg($s['avg_cycle_min']),
+                'avg_load_min' => $avg($s['avg_load_min']),
                 'avg_haul_min' => $avg($s['avg_haul_min']),
+                'avg_dump_min' => $avg($s['avg_dump_min']),
                 'avg_return_min' => $avg($s['avg_return_min']),
             ];
         }, $summaryMap));

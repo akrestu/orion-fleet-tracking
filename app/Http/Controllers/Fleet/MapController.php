@@ -7,13 +7,14 @@ use App\Models\Alert;
 use App\Models\Device;
 use App\Models\Geofence;
 use App\Models\MapTileset;
+use App\Services\GeofenceService;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class MapController extends Controller
 {
-    public function __invoke(): Response
+    public function __invoke(GeofenceService $geofenceService): Response
     {
         $groupIds = Auth::user()?->accessibleGroupIds();
 
@@ -32,7 +33,9 @@ class MapController extends Controller
             ->map(fn () => true)
             ->all();
 
-        $positions = $devices->map(function ($device) use ($alerting) {
+        $zones = $geofenceService->currentDwellZones($devices->pluck('dev_eui')->all());
+
+        $positions = $devices->map(function ($device) use ($alerting, $zones) {
             $latest = $device->gpsLogs->first();
 
             return [
@@ -52,6 +55,7 @@ class MapController extends Controller
                 'satellites' => $latest?->satellites,
                 'gateway_id' => $latest?->gateway_id,
                 'has_alert' => isset($alerting[$device->dev_eui]),
+                'zone' => $zones[$device->dev_eui] ?? null,
                 'recorded_at' => $latest?->recorded_at?->toIso8601String(),
             ];
         });

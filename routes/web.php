@@ -7,14 +7,25 @@ use App\Http\Controllers\Admin\DeviceController as AdminDeviceController;
 use App\Http\Controllers\Admin\DeviceGroupController as AdminDeviceGroupController;
 use App\Http\Controllers\Admin\GeofenceController as AdminGeofenceController;
 use App\Http\Controllers\Admin\ReportController as AdminReportController;
+use App\Http\Controllers\Admin\ShareLinkController as AdminShareLinkController;
 use App\Http\Controllers\Admin\SystemSettingController as AdminSystemSettingController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Fleet\MapController;
 use App\Http\Controllers\Fleet\MapTileController;
+use App\Http\Controllers\LiveShareController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login')->name('home');
+
+// Public read-only live map behind a share-link token (no login).
+// Generous limit: several control-room screens behind one NAT IP each poll every 10 s.
+Route::middleware('throttle:120,1')
+    ->where(['token' => '[A-Za-z0-9]{40}'])
+    ->group(function () {
+        Route::get('live/{token}', [LiveShareController::class, 'show'])->name('live.show');
+        Route::get('live/{token}/feed', [LiveShareController::class, 'feed'])->name('live.feed');
+    });
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
@@ -65,6 +76,9 @@ Route::middleware(['auth', 'verified', 'role:admin'])
         Route::get('reports/gateway-reliability', [AdminReportController::class, 'gatewayReliability'])->name('reports.gateway-reliability');
         Route::get('system-settings', [AdminSystemSettingController::class, 'index'])->name('system-settings.index');
         Route::put('system-settings', [AdminSystemSettingController::class, 'update'])->name('system-settings.update');
+        Route::get('share-links', [AdminShareLinkController::class, 'index'])->name('share-links.index');
+        Route::post('share-links', [AdminShareLinkController::class, 'store'])->name('share-links.store');
+        Route::delete('share-links/{shareLink}', [AdminShareLinkController::class, 'destroy'])->name('share-links.destroy');
         Route::get('api-tokens', [AdminApiTokenController::class, 'index'])->name('api-tokens.index');
         Route::post('api-tokens', [AdminApiTokenController::class, 'store'])->name('api-tokens.store');
         Route::delete('api-tokens/{apiToken}', [AdminApiTokenController::class, 'destroy'])->name('api-tokens.destroy');

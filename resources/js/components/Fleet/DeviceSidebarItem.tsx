@@ -1,3 +1,4 @@
+import { ZoneBadge } from '@/components/orion/badges';
 import { LastSeen } from '@/components/orion/misc';
 import { UnitIcon } from '@/components/orion/unit-icon';
 import { unitMeta } from '@/lib/orion/unit-types';
@@ -41,7 +42,7 @@ export function DeviceSidebarItem({
                     {device.device_name}
                     {device.unit_model && ` ${device.unit_model}`}
                 </span>
-                <span className="block text-xs">
+                <span className="flex items-center gap-2 text-xs">
                     {device.recorded_at ? (
                         <LastSeen at={device.recorded_at} />
                     ) : (
@@ -49,6 +50,7 @@ export function DeviceSidebarItem({
                             No GPS fix
                         </span>
                     )}
+                    {device.zone && <ZoneBadge zone={device.zone} />}
                 </span>
             </span>
 

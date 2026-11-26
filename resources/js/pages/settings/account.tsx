@@ -8,6 +8,7 @@ import {
     Layers,
     Moon,
     Settings,
+    Share2,
     Shield,
     SlidersHorizontal,
     UserRound,
@@ -129,6 +130,11 @@ export default function Account({ twoFactorEnabled, passkeyCount }: Props) {
             label: 'Reports & Export',
             icon: FileText,
             href: adminRoutes.reports.index.url(),
+        },
+        {
+            label: 'Live Map Links',
+            icon: Share2,
+            href: adminRoutes.shareLinks.index.url(),
         },
         {
             label: 'System Settings',

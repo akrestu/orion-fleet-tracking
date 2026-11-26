@@ -293,26 +293,18 @@ it('detects a completed loading-dumping-loading cycle', function () {
         ],
     ]);
 
-    $start = now()->subHours(2);
+    $this->device->update(['unit_type' => 'dt']);
+    $start = today()->addHours(8);
 
-    GpsLog::factory()->create([
-        'dev_eui' => $this->device->dev_eui,
-        'latitude' => 1.0,
-        'longitude' => 1.0,
-        'recorded_at' => $start,
-    ]);
-    GpsLog::factory()->create([
-        'dev_eui' => $this->device->dev_eui,
-        'latitude' => 2.0,
-        'longitude' => 2.0,
-        'recorded_at' => $start->copy()->addMinutes(10),
-    ]);
-    GpsLog::factory()->create([
-        'dev_eui' => $this->device->dev_eui,
-        'latitude' => 1.0,
-        'longitude' => 1.0,
-        'recorded_at' => $start->copy()->addMinutes(20),
-    ]);
+    // [lat/lng, minute]: loading → haul road → dumping → haul road → loading.
+    foreach ([[1.0, 0], [1.5, 2], [2.0, 10], [1.5, 12], [1.0, 20]] as [$coord, $minute]) {
+        GpsLog::factory()->create([
+            'dev_eui' => $this->device->dev_eui,
+            'latitude' => $coord,
+            'longitude' => $coord,
+            'recorded_at' => $start->copy()->addMinutes($minute),
+        ]);
+    }
 
     $response = $this->actingAs($this->admin)
         ->getJson('/admin/reports/cycle-time?from='.today()->toDateString().'&to='.today()->toDateString())
@@ -321,7 +313,7 @@ it('detects a completed loading-dumping-loading cycle', function () {
     $trips = $response->json('trips');
     expect($trips)->toHaveCount(1)
         ->and($trips[0]['cycle_duration_min'])->toBe(20)
-        ->and($trips[0]['haul_duration_min'])->toBe(10)
+        ->and($trips[0]['haul_duration_min'])->toBe(8)
         ->and($trips[0]['distance_km'])->toBeGreaterThan(0)
         ->and($trips[0]['avg_speed_kmh'])->toBeGreaterThan(0);
 });

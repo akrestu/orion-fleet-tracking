@@ -13,11 +13,13 @@ class GeofenceDeviceState extends Model
         'geofence_id',
         'dev_eui',
         'is_inside',
+        'entered_at',
         'checked_at',
     ];
 
     protected $casts = [
         'is_inside' => 'boolean',
+        'entered_at' => 'datetime',
         'checked_at' => 'datetime',
     ];
 

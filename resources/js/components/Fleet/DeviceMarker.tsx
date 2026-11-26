@@ -13,6 +13,8 @@ interface DeviceMarkerProps {
     device: DevicePosition;
     isSelected: boolean;
     canOpenDetails?: boolean;
+    /** Shared live map: popup hides EUI, radio and gateway details. */
+    publicView?: boolean;
     onSelect?: (devEui: string) => void;
 }
 
@@ -29,6 +31,7 @@ export function DeviceMarker({
     device,
     isSelected,
     canOpenDetails = false,
+    publicView = false,
     onSelect,
 }: DeviceMarkerProps) {
     const map = useMap();
@@ -124,6 +127,7 @@ export function DeviceMarker({
                 <UnitPopupContent
                     device={device}
                     canOpenDetails={canOpenDetails}
+                    publicView={publicView}
                 />
             </Popup>
         </Marker>

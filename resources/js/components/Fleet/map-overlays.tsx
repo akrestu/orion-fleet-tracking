@@ -2,7 +2,7 @@ import { Link } from '@inertiajs/react';
 import type L from 'leaflet';
 import { ArrowRight, Minus, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { StatusBadge } from '@/components/orion/badges';
+import { StatusBadge, ZoneBadge } from '@/components/orion/badges';
 import { LastSeen } from '@/components/orion/misc';
 import { UnitIcon } from '@/components/orion/unit-icon';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -260,15 +260,18 @@ function compass(deg: number): string {
 export function UnitPopupContent({
     device,
     canOpenDetails,
+    publicView = false,
 }: {
     device: DevicePosition;
     canOpenDetails: boolean;
+    /** Shared live map: hide EUI, radio and gateway details. */
+    publicView?: boolean;
 }) {
     const cat = unitMeta(device.unit_type);
     const isOnline = device.status === 'online';
     const dash = '—';
 
-    const cells: { label: string; value: ReactNode; mono?: boolean }[] = [
+    const allCells: { label: string; value: ReactNode; mono?: boolean }[] = [
         { label: 'Speed', value: `${device.speed_kmh.toFixed(1)} km/h` },
         {
             label: 'Heading',
@@ -288,6 +291,7 @@ export function UnitPopupContent({
             value: `${device.hdop !== null ? device.hdop.toFixed(1) : dash} · ${device.satellites ?? dash}`,
         },
     ];
+    const cells = publicView ? allCells.slice(0, 2) : allCells;
 
     return (
         <div className="w-[280px] text-sm">
@@ -298,12 +302,23 @@ export function UnitPopupContent({
                         {device.device_name}
                         {device.unit_model && ` ${device.unit_model}`}
                     </p>
-                    <p className="truncate font-mono text-xs text-muted-foreground">
-                        {device.dev_eui}
-                    </p>
+                    {!publicView && (
+                        <p className="truncate font-mono text-xs text-muted-foreground">
+                            {device.dev_eui}
+                        </p>
+                    )}
                 </div>
                 <StatusBadge online={isOnline} />
             </div>
+
+            {device.zone && (
+                <div className="border-b px-4 py-2">
+                    <ZoneBadge zone={device.zone} />
+                    <span className="ml-2 text-xs text-muted-foreground">
+                        {device.zone.name}
+                    </span>
+                </div>
+            )}
 
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 px-4 py-3">
                 {cells.map((c) => (
@@ -332,7 +347,9 @@ export function UnitPopupContent({
 
             <div className="flex items-center justify-between gap-2 border-t px-4 py-2.5 text-xs text-muted-foreground">
                 <span className="truncate">
-                    {device.gateway_id ? `via ${device.gateway_id} · ` : ''}
+                    {device.gateway_id && !publicView
+                        ? `via ${device.gateway_id} · `
+                        : ''}
                     {device.recorded_at ? (
                         <LastSeen at={device.recorded_at} />
                     ) : (

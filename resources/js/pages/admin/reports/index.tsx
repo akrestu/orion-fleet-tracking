@@ -135,6 +135,8 @@ type TripRow = {
     load_end: string;
     dump_start: string | null;
     dump_end: string | null;
+    load_duration_min: number | null;
+    dump_duration_min: number | null;
     cycle_duration_min: number | null;
     haul_duration_min: number | null;
     return_duration_min: number | null;
@@ -172,6 +174,8 @@ type TripSummary = {
     unit_type: string;
     trip_count: number;
     avg_cycle_min: number | null;
+    avg_load_min: number | null;
+    avg_dump_min: number | null;
     avg_haul_min: number | null;
     avg_return_min: number | null;
 };
@@ -2175,12 +2179,50 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
             ),
         },
         {
+            accessorKey: 'load_duration_min',
+            header: ({ column }) => (
+                <Button
+                    variant="ghost"
+                    className="-ml-3 h-8"
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
+                >
+                    Loading Time <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
+            cell: ({ row }) => (
+                <span className="font-medium tabular-nums">
+                    {formatMin(row.original.load_duration_min)}
+                </span>
+            ),
+        },
+        {
             accessorKey: 'dump_start',
             header: 'Dump Start',
             cell: ({ row }) => (
                 <div className="text-sm font-medium text-foreground tabular-nums">
                     {formatTime(row.original.dump_start)}
                 </div>
+            ),
+        },
+        {
+            accessorKey: 'dump_duration_min',
+            header: ({ column }) => (
+                <Button
+                    variant="ghost"
+                    className="-ml-3 h-8"
+                    onClick={() =>
+                        column.toggleSorting(column.getIsSorted() === 'asc')
+                    }
+                >
+                    Dumping Time <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            ),
+            cell: ({ row }) => (
+                <span className="font-medium tabular-nums">
+                    {formatMin(row.original.dump_duration_min)}
+                </span>
             ),
         },
         {
@@ -2315,7 +2357,7 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-3 text-center sm:grid-cols-4">
                                     <div>
                                         <p className="text-2xl font-bold text-primary tabular-nums">
                                             {s.trip_count}
@@ -2326,10 +2368,18 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
                                     </div>
                                     <div>
                                         <p className="text-xl font-semibold tabular-nums">
-                                            {formatMin(s.avg_haul_min)}
+                                            {formatMin(s.avg_load_min)}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            Avg Haul
+                                            Avg Loading
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xl font-semibold tabular-nums">
+                                            {formatMin(s.avg_dump_min)}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Avg Dumping
                                         </p>
                                     </div>
                                     <div>
@@ -2396,9 +2446,9 @@ function CycleTimeTab({ devices }: { devices: DeviceOption[] }) {
                                         </p>
                                         {loaded && (
                                             <p className="text-xs">
-                                                A trip is detected when a device
-                                                visits a Loading zone then a
-                                                Dumping zone.
+                                                A trip is detected when a hauler
+                                                (OHT / DT) visits a Loading zone
+                                                then a Dumping zone.
                                             </p>
                                         )}
                                     </div>

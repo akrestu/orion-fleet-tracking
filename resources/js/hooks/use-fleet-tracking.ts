@@ -1,6 +1,6 @@
 import { echo, useConnectionStatus } from '@laravel/echo-react';
 import { useCallback, useEffect, useState } from 'react';
-import type { DevicePosition } from '@/types/fleet';
+import type { DevicePosition, DwellZone } from '@/types/fleet';
 
 /**
  * Resolves which private channels carry this user's authorized device updates.
@@ -33,20 +33,41 @@ export function useFleetTracking(
         );
     }, []);
 
+    const handleZoneChange = useCallback(
+        (data: { dev_eui: string; zone: DwellZone | null }) => {
+            setPositions((prev) => {
+                const current = prev.get(data.dev_eui);
+
+                return current
+                    ? new Map(prev).set(data.dev_eui, {
+                          ...current,
+                          zone: data.zone,
+                      })
+                    : prev;
+            });
+        },
+        [],
+    );
+
     useEffect(() => {
         const channelNames = resolveChannelNames(accessibleGroupIds);
 
         channelNames.forEach((name) => {
             echo()
                 .private(name)
-                .listen('.device.position.updated', handlePositionUpdate);
+                .listen('.device.position.updated', handlePositionUpdate)
+                .listen('.device.zone.changed', handleZoneChange);
         });
 
         return () => {
             channelNames.forEach((name) => echo().leave(name));
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [JSON.stringify(accessibleGroupIds), handlePositionUpdate]);
+    }, [
+        JSON.stringify(accessibleGroupIds),
+        handlePositionUpdate,
+        handleZoneChange,
+    ]);
 
     return {
         positions,

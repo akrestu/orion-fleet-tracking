@@ -329,7 +329,9 @@ class ReportController extends Controller
             'Load End' => $t['load_end'],
             'Dump Start' => $t['dump_start'],
             'Dump End' => $t['dump_end'],
+            'Loading Time (min)' => $t['load_duration_min'],
             'Haul Duration (min)' => $t['haul_duration_min'],
+            'Dumping Time (min)' => $t['dump_duration_min'],
             'Return Duration (min)' => $t['return_duration_min'],
             'Cycle Duration (min)' => $t['cycle_duration_min'],
             'Distance (km)' => $t['distance_km'],
@@ -339,7 +341,7 @@ class ReportController extends Controller
         $filename = 'cycle-time-'.$from->toDateString().'-to-'.$to->toDateString().'.xlsx';
 
         return Excel::download(
-            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Load Start', 'Load End', 'Dump Start', 'Dump End', 'Haul Duration (min)', 'Return Duration (min)', 'Cycle Duration (min)', 'Distance (km)', 'Avg Speed (km/h)'], 'Cycle Time'),
+            new ArrayExport($export, ['Device Name', 'DEV EUI', 'Unit Type', 'Load Start', 'Load End', 'Dump Start', 'Dump End', 'Loading Time (min)', 'Haul Duration (min)', 'Dumping Time (min)', 'Return Duration (min)', 'Cycle Duration (min)', 'Distance (km)', 'Avg Speed (km/h)'], 'Cycle Time'),
             $filename,
         );
     }

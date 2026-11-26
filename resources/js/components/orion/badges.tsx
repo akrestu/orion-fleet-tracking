@@ -1,6 +1,65 @@
-import { Gauge, Hexagon, SignalLow, WifiOff } from 'lucide-react';
+import {
+    ArrowDownToLine,
+    ArrowUpFromLine,
+    Gauge,
+    Hexagon,
+    SignalLow,
+    WifiOff,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useNow } from '@/hooks/use-tick';
 import { cn } from '@/lib/utils';
+import type { DwellZone } from '@/types/fleet';
+
+/** "45 s" / "12 min" / "1 h 05 min" — elapsed dwell time. */
+export function formatDwell(seconds: number): string {
+    const s = Math.max(0, Math.round(seconds));
+
+    if (s < 60) {
+        return `${s} s`;
+    }
+
+    const m = Math.floor(s / 60);
+
+    return m < 60
+        ? `${m} min`
+        : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`;
+}
+
+const ZONE_META: Record<
+    DwellZone['type'],
+    { label: string; icon: LucideIcon }
+> = {
+    loading: { label: 'Loading', icon: ArrowDownToLine },
+    dumping: { label: 'Dumping', icon: ArrowUpFromLine },
+};
+
+/* ---------- Live loading/dumping dwell (haulers) — icon + label + running timer ---------- */
+export function ZoneBadge({
+    zone,
+    className,
+}: {
+    zone: DwellZone;
+    className?: string;
+}) {
+    const now = useNow(5_000);
+    const meta = ZONE_META[zone.type];
+    const Icon = meta.icon;
+    const elapsed = (now - new Date(zone.entered_at).getTime()) / 1000;
+
+    return (
+        <span
+            title={`${meta.label} · ${zone.name}`}
+            className={cn(
+                'inline-flex items-center gap-1 rounded-md bg-accent px-1.5 py-0.5 text-xs font-medium whitespace-nowrap text-accent-foreground tabular-nums',
+                className,
+            )}
+        >
+            <Icon className="size-3" aria-hidden />
+            {meta.label} · {formatDwell(elapsed)}
+        </span>
+    );
+}
 
 /* ---------- Status (online / offline) — always dot + label, never colour alone ---------- */
 export function StatusBadge({

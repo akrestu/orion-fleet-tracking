@@ -8,6 +8,7 @@ import {
     Map,
     MapPinned,
     Settings2,
+    Share2,
     SlidersHorizontal,
     Users,
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import adminDeviceGroups from '@/routes/admin/device-groups';
 import adminDevices from '@/routes/admin/devices';
 import adminGeofences from '@/routes/admin/geofences';
 import adminReports from '@/routes/admin/reports';
+import adminShareLinks from '@/routes/admin/share-links';
 import adminSystemSettings from '@/routes/admin/system-settings';
 import adminUsers from '@/routes/admin/users';
 import fleet from '@/routes/fleet';
@@ -83,6 +85,11 @@ const adminNavItems: NavItem[] = [
         title: 'Reports & Export',
         href: adminReports.index.url(),
         icon: BarChart3,
+    },
+    {
+        title: 'Live Map Links',
+        href: adminShareLinks.index.url(),
+        icon: Share2,
     },
     {
         title: 'System Settings',
