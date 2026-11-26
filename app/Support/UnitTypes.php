@@ -15,59 +15,68 @@ class UnitTypes
             'oht' => [
                 'label' => 'OHT – Off-Highway Truck',
                 'models' => [
-                    'CAT 777G', 'CAT 773G', 'CAT 785D',
-                    'Komatsu HD785-8', 'Komatsu HD465-7E0',
-                    'Liebherr T 284', 'Hitachi EH5000AC-3',
+                    'CAT 773D', 'CAT 773E', 'CAT 775F', 'CAT 777E',
+                    'Belaz 7555B', 'Volvo A60H',
                 ],
             ],
             'dt' => [
                 'label' => 'DT – Dump Truck',
                 'models' => [
-                    'Hino 500 FM260TI', 'Hino 500 FM320TI',
-                    'Mercedes Actros 4045', 'Scania R500',
-                    'Volvo FMX 460', 'MAN TGS 40.440',
+                    'UD Trucks CWE28064R', 'UD Trucks CWE37064R', 'UD Trucks CGE37084R',
+                    'Hongyan Kingkan 380', 'Hongyan Kingkan 430',
+                    'Mercedes-Benz Axor 2528',
                 ],
             ],
             'dozer' => [
                 'label' => 'Dozer – Bulldozer',
                 'models' => [
-                    'CAT D10T2', 'CAT D8T', 'CAT D6T',
-                    'Komatsu D155AX-8', 'Komatsu D375A-8',
-                    'Komatsu D65EX-18',
+                    'CAT D6R2 XL', 'CAT D8R', 'CAT D8T', 'CAT D9R', 'CAT D9T', 'CAT D10T2',
+                    'LiuGong LD26D',
                 ],
             ],
             'excavator' => [
                 'label' => 'Excavator',
                 'models' => [
-                    'CAT 390F L', 'CAT 6060FS',
-                    'Komatsu PC2000-11', 'Komatsu PC800SE-11',
-                    'Hitachi EX2600-7', 'Liebherr R 9400 G8',
+                    'CAT 390F L', 'CAT 6015B', 'CAT 6020B',
+                    'Hitachi EX1200-6', 'Hitachi EX1900-6', 'Hitachi ZX470LC-5G',
+                    'Kobelco SK200-10', 'Kobelco SK210LC-10', 'Kobelco SK330-10',
+                    'Kobelco SK480LC-8', 'Kobelco SK520XD-10', 'Kobelco SK520XDLC-10',
+                    'LiuGong CLG975E HD',
                 ],
             ],
             'grader' => [
                 'label' => 'Grader – Motor Grader',
                 'models' => [
-                    'CAT 16M3', 'CAT 14M3', 'CAT 12M3',
-                    'Komatsu GD825A-2', 'Komatsu GD655-7',
+                    'CAT 14M', 'CAT 14M3', 'LiuGong 4230DS',
                 ],
             ],
             'compactor' => [
                 'label' => 'Compactor – Road Roller',
                 'models' => [
-                    'CAT CS56B', 'CAT CP56B',
-                    'Bomag BW 219 DH-5', 'Dynapac CA2500',
+                    'LiuGong CLG6620E',
                 ],
             ],
             'driller' => [
                 'label' => 'Driller – Drill Rig',
                 'models' => [
-                    'CAT MD6250', 'Atlas Copco PV351',
-                    'Sandvik DR461i', 'Epiroc PitViper 271',
+                    'CAT MD6250', 'Epiroc PitViper 271', 'Sandvik DR461i',
                 ],
             ],
             'other' => [
-                'label' => 'Other',
-                'models' => [],
+                'label' => 'Other – Supporting Equipment',
+                'models' => [
+                    'Fuel Truck UD Trucks CWE28064R', 'Fuel Truck Dongfeng KC375',
+                    'Water Truck UD Trucks CWE28064R', 'Water Truck CAT 775F', 'Water Truck Dongfeng DRI465',
+                    'Service Truck UD Trucks CWE28064R', 'Service Truck Mercedes-Benz Actros 4043',
+                    'Crane Truck UD Trucks CWE28064R', 'Crane Truck Dongfeng DFL3258A6', 'Crane Truck LiuGong LTC550L5',
+                    'Light Vehicle Mitsubishi Triton', 'Light Vehicle Mitsubishi Pajero Sport', 'Light Vehicle Toyota Hilux',
+                    'Bus Man Haul', 'Manhaul Isuzu ELF NLR 55B LX',
+                    'Telehandler Manitou MHT-X 790', 'Wheel Loader John Deere 744K',
+                    'Forklift CAT DP50NT',
+                    'Lighting Tower', 'Mega Tower', 'Genset',
+                    'Air Compressor Atlas Copco XAHS38', 'Welding Machine Miller Big Blue 600X',
+                    'Mine Pump KSB', 'Water Fill Pump Ebara',
+                ],
             ],
         ];
     }
@@ -76,6 +85,21 @@ class UnitTypes
     public static function keys(): array
     {
         return array_keys(static::categories());
+    }
+
+    /**
+     * Hauling units — the only ones whose loading/dumping dwell and cycles are tracked.
+     *
+     * @return string[]
+     */
+    public static function haulers(): array
+    {
+        return ['oht', 'dt'];
+    }
+
+    public static function isHauler(?string $key): bool
+    {
+        return in_array($key, static::haulers(), true);
     }
 
     public static function label(string $key): string

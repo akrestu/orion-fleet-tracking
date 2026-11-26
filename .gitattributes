@@ -9,3 +9,7 @@
 CHANGELOG.md export-ignore
 README.md export-ignore
 .github/workflows/browser-tests.yml export-ignore
+
+*.sh text eol=lf
+docker/* text eol=lf
+Dockerfile text eol=lf

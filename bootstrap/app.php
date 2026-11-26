@@ -21,6 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Coolify's Traefik terminates TLS in front of the container.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'role' => EnsureUserRole::class,
             'api.token' => ValidateApiToken::class,

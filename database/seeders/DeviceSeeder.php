@@ -14,14 +14,14 @@ class DeviceSeeder extends Seeder
                 'dev_eui' => '9956efb31332a835',
                 'application_id' => '7791e609-dbc6-4c9e-abc9-43e1c6c163d3',
                 'device_name' => '2026_Hauler_0001',
-                'unit_type' => 'hauler',
+                'unit_type' => 'oht',
                 'is_active' => true,
             ],
             [
                 'dev_eui' => 'aabbccddeeff0011',
                 'application_id' => '7791e609-dbc6-4c9e-abc9-43e1c6c163d3',
                 'device_name' => '2026_Hauler_0002',
-                'unit_type' => 'hauler',
+                'unit_type' => 'oht',
                 'is_active' => true,
             ],
             [
