@@ -6,8 +6,10 @@
 
 FROM php:8.4-fpm-alpine AS base
 
-COPY --from=mlocati/php-extension-installer:2.7 /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_mysql pcntl bcmath intl zip gd opcache sockets \
+COPY --from=mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+RUN apk add --no-cache --virtual .phpize-deps $PHPIZE_DEPS \
+    && install-php-extensions pdo_mysql pcntl bcmath intl zip gd sockets \
+    && apk del .phpize-deps \
     && apk add --no-cache nginx supervisor tzdata \
     && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
